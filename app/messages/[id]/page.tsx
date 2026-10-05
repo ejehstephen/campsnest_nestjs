@@ -36,6 +36,7 @@ import {
 } from "@/lib/messages/actions";
 import { createClient } from "@/lib/supabase/client";
 import { isVideoUrl, sanitizeUUID } from "@/lib/utils";
+import { useAuth } from "@/lib/auth/auth-provider";
 
 
 interface Message {
@@ -48,6 +49,8 @@ interface Message {
 }
 
 function ChatThreadContent() {
+  const { profile, user } = useAuth();
+  const currentUserId = profile?.id || user?.id;
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -264,14 +267,17 @@ const globalChatMessagesCache = new Map<string, Message[]>();
       try {
         const res = await fetchConversationMessagesAction(cleanId);
         if (res.success && res.messages && res.messages.length > 0) {
-          const mapped = res.messages.map((m) => ({
-            id: m.id,
-            sender: "me" as const,
-            text: m.text,
-            time: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            status: (m.is_read ? "read" : "sent") as "read" | "sent",
-            image: m.image_url || undefined,
-          }));
+          const mapped = res.messages.map((m) => {
+            const isMe = currentUserId ? m.sender_id === currentUserId : false;
+            return {
+              id: m.id,
+              sender: isMe ? ("me" as const) : ("them" as const),
+              text: m.text,
+              time: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              status: (m.is_read ? "read" : "sent") as "read" | "sent",
+              image: m.image_url || undefined,
+            };
+          });
 
           globalChatMessagesCache.set(cleanId, mapped);
           if (isMounted) {
@@ -318,11 +324,12 @@ const globalChatMessagesCache = new Map<string, Message[]>();
                 if (prev.some((m) => m.id === newMsg.id || (m.text === newMsg.text && Math.abs(Date.now() - new Date(newMsg.created_at).getTime()) < 3000))) {
                   return prev;
                 }
+                const isMe = currentUserId ? newMsg.sender_id === currentUserId : false;
                 return [
                   ...prev,
                   {
                     id: newMsg.id,
-                    sender: "me",
+                    sender: isMe ? "me" : "them",
                     text: newMsg.text,
                     time: new Date(newMsg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                     status: newMsg.is_read ? "read" : "sent",
@@ -341,7 +348,7 @@ const globalChatMessagesCache = new Map<string, Message[]>();
     } catch (err) {
       console.warn("Realtime subscription notice:", err);
     }
-  }, [cleanId]);
+  }, [cleanId, currentUserId]);
 
   // Sync with localStorage thread summary
   const persistConversationSummary = React.useCallback((lastMsg: string) => {
@@ -546,34 +553,50 @@ const globalChatMessagesCache = new Map<string, Message[]>();
           return (
             <div
               key={msg.id}
-              className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"}`}
+              className={`flex items-end gap-2.5 ${isMe ? "justify-end" : "justify-start"}`}
             >
               {!isMe && (
-                <Avatar size="sm" src={thread.user.avatar} name={thread.user.name} alt={thread.user.name} className="mb-1" />
+                <Avatar
+                  size="sm"
+                  src={thread.user.avatar}
+                  name={thread.user.name}
+                  alt={thread.user.name}
+                  className="mb-1 shrink-0 h-8 w-8 text-[10px] ring-2 ring-white/10"
+                />
               )}
 
-              <div
-                className={`max-w-[85%] sm:max-w-[70%] rounded-3xl p-3.5 space-y-1.5 shadow-lg ${
-                  isMe
-                    ? "bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] text-white rounded-br-xs"
-                    : "bg-[#1E183D] border border-white/10 text-slate-100 rounded-bl-xs"
-                }`}
-              >
-                {msg.image && (
-                  <img
-                    src={msg.image}
-                    alt="Attached inspection photo"
-                    className="rounded-2xl max-h-56 w-full object-cover border border-white/10"
-                  />
+              <div className={`flex flex-col ${isMe ? "items-end" : "items-start"} max-w-[85%] sm:max-w-[70%]`}>
+                {/* Sender label for other person so the user always knows who chatted */}
+                {!isMe && (
+                  <span className="text-[11px] font-bold text-brand-violet-light px-2 mb-1 flex items-center gap-1.5">
+                    <span>{thread.user.name}</span>
+                    <span className="text-[9px] font-normal text-text-dim">• {thread.user.role}</span>
+                  </span>
                 )}
 
-                <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-line">{msg.text}</p>
-
-                <div className={`flex items-center gap-1 justify-end text-[10px] ${isMe ? "text-white/80" : "text-text-dim"}`}>
-                  <span>{msg.time}</span>
-                  {isMe && (
-                    <CheckCheck className={`h-3.5 w-3.5 ${msg.status === "read" ? "text-cyan-300" : "text-white/60"}`} />
+                <div
+                  className={`w-full rounded-3xl p-3.5 space-y-1.5 shadow-lg ${
+                    isMe
+                      ? "bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] text-white rounded-br-xs shadow-[0_4px_16px_rgba(139,92,246,0.25)]"
+                      : "bg-[#1E183D] border border-white/15 text-slate-100 rounded-bl-xs"
+                  }`}
+                >
+                  {msg.image && (
+                    <img
+                      src={msg.image}
+                      alt="Attached media"
+                      className="rounded-2xl max-h-56 w-full object-cover border border-white/10"
+                    />
                   )}
+
+                  <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-line">{msg.text}</p>
+
+                  <div className={`flex items-center gap-1 justify-end text-[10px] ${isMe ? "text-white/80" : "text-text-dim"}`}>
+                    <span>{msg.time}</span>
+                    {isMe && (
+                      <CheckCheck className={`h-3.5 w-3.5 ${msg.status === "read" ? "text-cyan-300" : "text-white/60"}`} />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

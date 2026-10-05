@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { createNotificationAction } from "@/lib/notifications/actions";
-import { sanitizeUUID } from "@/lib/utils";
+import { sanitizeUUID, parseUserName, formatNameFromEmail } from "@/lib/utils";
 
 export interface DBMessage {
   id: string;
@@ -24,8 +24,6 @@ export interface DBConversation {
   last_message?: string;
   participant_ids: string[];
 }
-
-
 
 function formatRelativeTime(dateString?: string): string {
   if (!dateString) return "Recently";
@@ -49,7 +47,8 @@ function formatRelativeTime(dateString?: string): string {
 }
 
 /**
- * Fetch all conversations for the current user fully hydrated from Supabase.
+ * Fetch all conversations for the authenticated user only.
+ * Other users' conversations are strictly excluded.
  */
 export async function fetchUserConversationsAction(): Promise<{
   success: boolean;
@@ -58,45 +57,112 @@ export async function fetchUserConversationsAction(): Promise<{
 }> {
   try {
     const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const currentUserId = user?.id;
 
-    // 1. Fetch conversations
-    const { data: convs, error: convErr } = await supabase
-      .from("conversations")
-      .select("*")
-      .order("updated_at", { ascending: false });
-
-    if (convErr || !convs) {
-      return { success: false, conversations: [], error: convErr?.message };
-    }
-
-    if (convs.length === 0) {
+    // If user is not authenticated, do not expose any user conversations
+    if (!currentUserId) {
       return { success: true, conversations: [] };
     }
 
-    // 2. Fetch all messages
+    // 1. Gather all conversation IDs where current user is a participant or sender
+    const userConvIds = new Set<string>();
+
+    // A. Check conversation_participants table
+    try {
+      const { data: participants } = await supabase
+        .from("conversation_participants")
+        .select("conversation_id")
+        .eq("user_id", currentUserId);
+
+      (participants || []).forEach((p) => {
+        if (p.conversation_id) userConvIds.add(p.conversation_id);
+      });
+    } catch (e) {
+      // conversation_participants table may be empty or newly created
+    }
+
+    // B. Check messages sent by current user
+    const { data: userSentMsgs } = await supabase
+      .from("messages")
+      .select("conversation_id")
+      .eq("sender_id", currentUserId);
+
+    (userSentMsgs || []).forEach((m) => {
+      if (m.conversation_id) userConvIds.add(m.conversation_id);
+    });
+
+    // C. Check conversations on listings or items owned by current user
+    try {
+      const [housesRes, itemsRes] = await Promise.all([
+        supabase.from("room_listings").select("id").eq("owner_id", currentUserId),
+        supabase.from("marketplace_items").select("id").eq("seller_id", currentUserId),
+      ]);
+
+      const myContextIds = [
+        ...(housesRes.data || []).map((h) => h.id),
+        ...(itemsRes.data || []).map((i) => i.id),
+      ];
+
+      if (myContextIds.length > 0) {
+        const { data: listingConvs } = await supabase
+          .from("conversations")
+          .select("id")
+          .in("context_id", myContextIds);
+
+        (listingConvs || []).forEach((c) => {
+          if (c.id) userConvIds.add(c.id);
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // If no conversations belong to this user, return empty list
+    if (userConvIds.size === 0) {
+      return { success: true, conversations: [] };
+    }
+
+    const convIdList = Array.from(userConvIds);
+
+    // 2. Fetch only the user's conversations
+    const { data: convs, error: convErr } = await supabase
+      .from("conversations")
+      .select("*")
+      .in("id", convIdList)
+      .order("updated_at", { ascending: false });
+
+    if (convErr || !convs || convs.length === 0) {
+      return { success: true, conversations: [] };
+    }
+
+    // 3. Fetch messages for these specific conversations
     const { data: msgs } = await supabase
       .from("messages")
       .select("*")
+      .in("conversation_id", convIdList)
       .order("created_at", { ascending: false });
 
-    // 3. Fetch users for sender details
+    // 4. Fetch users for participant details
     const { data: users } = await supabase
       .from("users")
-      .select("id, name, profile_image, department, level, school");
+      .select("id, name, email, profile_image, department, level, school");
 
     const userMap = new Map((users || []).map((u) => [u.id, u]));
 
     const hydrated = convs.map((conv) => {
       const convMsgs = (msgs || []).filter((m) => m.conversation_id === conv.id);
       const lastMsg = convMsgs[0];
-      const otherSenderMsg = convMsgs.find((m) => m.sender_id && userMap.has(m.sender_id));
+
+      // Identify the other participant (not the current logged-in user)
+      const otherSenderMsg = convMsgs.find((m) => m.sender_id && m.sender_id !== currentUserId && userMap.has(m.sender_id));
       const senderUser = otherSenderMsg
         ? userMap.get(otherSenderMsg.sender_id)
-        : lastMsg?.sender_id
-        ? userMap.get(lastMsg.sender_id)
+        : convMsgs.find((m) => m.sender_id && userMap.has(m.sender_id))
+        ? userMap.get(convMsgs.find((m) => m.sender_id && userMap.has(m.sender_id))!.sender_id)
         : null;
 
-      const userName = senderUser?.name || conv.title || "Student Resident";
+      const userName = parseUserName(senderUser, null, conv.title || "Student Resident");
       const userRole = senderUser?.department
         ? `${senderUser.department} • ${senderUser.level || "Student"}`
         : conv.type === "housing"
@@ -129,7 +195,7 @@ export async function fetchUserConversationsAction(): Promise<{
         avatar: userAvatar,
         lastMessage: lastMsg?.text || "Conversation started",
         time: formatRelativeTime(lastMsg?.created_at || conv.updated_at),
-        unread: convMsgs.filter((m) => !m.is_read).length,
+        unread: convMsgs.filter((m) => !m.is_read && m.sender_id !== currentUserId).length,
         context: {
           type: conv.type || "housing",
           title: cleanTitle,
@@ -180,7 +246,34 @@ export async function fetchConversationThreadAction(conversationId: string): Pro
 
     // 3. Find other participant ID
     const otherMsg = msgs?.find((m) => m.sender_id && m.sender_id !== currentUserId);
-    const targetUserId = otherMsg?.sender_id || msgs?.[0]?.sender_id;
+    let targetUserId = otherMsg?.sender_id;
+
+    // If no other sender message in thread, check context_id for host/seller
+    if (!targetUserId && conv?.context_id) {
+      if (conv.type === "housing") {
+        const { data: house } = await supabase
+          .from("room_listings")
+          .select("owner_id")
+          .eq("id", conv.context_id)
+          .maybeSingle();
+        if (house?.owner_id && house.owner_id !== currentUserId) {
+          targetUserId = house.owner_id;
+        }
+      } else if (conv.type === "market") {
+        const { data: item } = await supabase
+          .from("marketplace_items")
+          .select("seller_id")
+          .eq("id", conv.context_id)
+          .maybeSingle();
+        if (item?.seller_id && item.seller_id !== currentUserId) {
+          targetUserId = item.seller_id;
+        }
+      }
+    }
+
+    if (!targetUserId) {
+      targetUserId = msgs?.[0]?.sender_id;
+    }
 
     let participantName = conv?.title || "Student Resident";
     let participantRole = conv?.type === "housing" ? "Property Host" : conv?.type === "market" ? "Marketplace Seller" : "Campus Resident";
@@ -189,12 +282,12 @@ export async function fetchConversationThreadAction(conversationId: string): Pro
     if (targetUserId) {
       const { data: u } = await supabase
         .from("users")
-        .select("name, profile_image, department, level, school")
+        .select("id, name, email, profile_image, department, level, school")
         .eq("id", targetUserId)
         .maybeSingle();
 
       if (u) {
-        if (u.name) participantName = u.name;
+        participantName = parseUserName(u, null, conv?.title || "Student Resident");
         if (u.department) participantRole = `${u.department} • ${u.level || "Student"}`;
         if (u.profile_image && !u.profile_image.includes("example.com")) {
           participantAvatar = u.profile_image;
@@ -286,11 +379,13 @@ export async function fetchListingDetailsAction(
       if (listing?.owner_id) {
         const { data: owner } = await supabase
           .from("users")
-          .select("name, profile_image")
+          .select("id, name, full_name, username, email, profile_image")
           .eq("id", listing.owner_id)
           .single();
-        if (owner?.name) ownerName = owner.name;
-        if (owner?.profile_image) ownerAvatar = owner.profile_image;
+        if (owner) {
+          ownerName = parseUserName(owner, null, "Property Host");
+          if (owner.profile_image) ownerAvatar = owner.profile_image;
+        }
       }
 
       const mediaUrl = imageRows?.[0]?.images || "";
@@ -367,7 +462,27 @@ export async function sendMessageAction(params: {
         id: cleanConvId,
         title: params.contextTitle || "Direct Conversation",
         type: params.contextType || "housing",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
+    } else {
+      await supabase
+        .from("conversations")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", cleanConvId);
+    }
+
+    // Register participants in conversation_participants
+    try {
+      const participants = [{ conversation_id: cleanConvId, user_id: senderId }];
+      if (params.recipientId && params.recipientId !== senderId) {
+        participants.push({ conversation_id: cleanConvId, user_id: params.recipientId });
+      }
+      await supabase
+        .from("conversation_participants")
+        .upsert(participants, { onConflict: "conversation_id,user_id" });
+    } catch (pe) {
+      // conversation_participants upsert fallback
     }
 
     // 2. Insert message into Supabase messages table
@@ -380,6 +495,7 @@ export async function sendMessageAction(params: {
         text: params.text,
         image_url: params.imageUrl || null,
         is_read: false,
+        created_at: new Date().toISOString(),
       })
       .select()
       .single();

@@ -309,9 +309,9 @@ export default function MarketPage() {
                   key={item.id}
                   elevation="elevated"
                   interactive
-                  className="rounded-2xl border-white/10 overflow-hidden group flex flex-col justify-between transition-all duration-300 hover:border-brand-violet/50"
+                  className="rounded-2xl border-white/10 overflow-hidden group flex flex-col justify-between transition-all duration-300 hover:border-brand-violet/50 cursor-pointer"
                 >
-                  <div>
+                  <Link href={`/market/${item.id}`} className="block group cursor-pointer focus:outline-none">
                     {/* Media / Photo Box */}
                     <div className="relative aspect-square overflow-hidden bg-slate-900">
                       <img
@@ -327,8 +327,10 @@ export default function MarketPage() {
                         </span>
 
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.preventDefault();
+                            e.stopPropagation();
                             toggleBookmark(item.id);
                           }}
                           className={`pointer-events-auto h-7 w-7 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${isSaved
@@ -372,12 +374,15 @@ export default function MarketPage() {
                         </h3>
                       </div>
                     </div>
-                  </div>
+                  </Link>
 
                   {/* Card Bottom CTA Actions */}
                   <div className="px-3 pb-3 sm:px-4 sm:pb-4 pt-1.5 border-t border-white/5 flex items-center justify-between gap-1.5">
                     {/* Seller Name / Avatar */}
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <Link
+                      href={`/market/${item.id}`}
+                      className="flex items-center gap-1.5 min-w-0 flex-1 hover:opacity-80 transition-opacity"
+                    >
                       <Avatar
                         src={item.seller.avatar}
                         name={item.seller.name}
@@ -388,7 +393,7 @@ export default function MarketPage() {
                       <span className="text-[10px] font-semibold text-text-secondary truncate">
                         {item.seller.name}
                       </span>
-                    </div>
+                    </Link>
 
                     {/* Direct Contact Seller via WhatsApp (Gradient Button) */}
                     <a
@@ -396,6 +401,7 @@ export default function MarketPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="shrink-0"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <button className="py-1.5 px-3 rounded-full bg-gradient-to-r from-brand-violet via-[#A855F7] to-brand-magenta text-white text-[11px] font-bold shadow-[0_2px_10px_rgba(236,72,153,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center gap-1 cursor-pointer">
                         <MessageSquare className="h-3 w-3" />

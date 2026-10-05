@@ -41,7 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { PostHouseModal, PublishedHouse } from "@/components/housing/post-house-modal";
-import { isVideoUrl } from "@/lib/utils";
+import { isVideoUrl, parseUserName } from "@/lib/utils";
 import { ShareModal } from "@/components/common/share-modal";
 import { fetchHousingListingsAction } from "@/lib/housing/actions";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -147,7 +147,7 @@ export default function HousingDiscoveryPage() {
             const primaryImg = item.image || (dbImages.length > 0 ? dbImages[0] : "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80");
             
             const ownerRecord = item.owner || null;
-            const hostName = ownerRecord?.name || item.host_name || "Verified Campus Host";
+            const hostName = parseUserName(ownerRecord, null, item.host_name || "Verified Campus Host");
             const hostAvatar = (ownerRecord?.profile_image && !ownerRecord.profile_image.includes("example.com") ? ownerRecord.profile_image : "") || "";
             const hostRole = ownerRecord?.level || (ownerRecord?.role === "admin" ? "Verified Host Admin" : "Lodge Host");
             const hostInitials = hostName.split(" ").filter(Boolean).map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "VH";

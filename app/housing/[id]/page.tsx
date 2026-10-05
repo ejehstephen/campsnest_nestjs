@@ -43,6 +43,7 @@ import { ShareModal } from "@/components/common/share-modal";
 import { fetchHousingListingByIdAction, bookInspectionAction } from "@/lib/housing/actions";
 import { HOUSING_LISTINGS, HousingItem } from "@/lib/housing/constants";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { parseUserName } from "@/lib/utils";
 import { isVideoUrl } from "@/lib/utils";
 
 export default function HousingDetailPage({ params }: { params: { id: string } }) {
@@ -164,7 +165,7 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
 
   // Dynamic host profile extraction from Supabase owner relation or local listing
   const ownerRecord = house.owner || null;
-  const hostName = house.host?.name || ownerRecord?.name || house.host_name || "Verified Student Host";
+  const hostName = parseUserName(ownerRecord, null, house.host?.name || house.host_name || "Verified Student Host");
   const hostAvatar = house.host?.avatar || (ownerRecord?.profile_image && !ownerRecord.profile_image.includes("example.com") ? ownerRecord.profile_image : "") || "";
   const hostRole = ownerRecord?.level || house.host?.role || house.host_role || (ownerRecord?.role === "admin" ? "Verified Host Admin" : "Student Host");
   const hostSchool = ownerRecord?.school || house.school || "Federal University Wukari";

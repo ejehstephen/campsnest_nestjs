@@ -240,4 +240,83 @@ export function isVideoUrl(url: string | undefined | null): boolean {
   );
 }
 
+/**
+ * Format human-readable name from email prefix (e.g. 'ejehstephen966@gmail.com' -> 'Ejeh Stephen')
+ */
+export function formatNameFromEmail(email?: string | null): string {
+  if (!email || !email.includes("@")) return "Campus Student";
+  const prefix = email.split("@")[0].replace(/[0-9]/g, " ").trim();
+  if (!prefix) return "Campus Student";
+  return prefix
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
 
+/**
+ * Intelligently parse a user's name across legacy Flutter data, Supabase Auth user_metadata,
+ * and current Next.js models, preventing unwanted 'Stephen Ekeson' or 'New User' default names.
+ */
+export function parseUserName(
+  dbRecord?: Record<string, any> | null,
+  authUser?: Record<string, any> | null,
+  fallback = "Campus Student"
+): string {
+  const isInvalid = (val?: any): boolean => {
+    if (!val || typeof val !== "string") return true;
+    const clean = val.trim().toLowerCase();
+    return (
+      clean === "" ||
+      clean === "new user" ||
+      clean === "null" ||
+      clean === "undefined" ||
+      clean === "stephen ekeson" ||
+      clean === "student resident" ||
+      clean === "verified campus host"
+    );
+  };
+
+  // 1. Direct DB Record fields
+  if (dbRecord) {
+    if (!isInvalid(dbRecord.name)) return dbRecord.name.trim();
+    if (!isInvalid(dbRecord.full_name)) return dbRecord.full_name.trim();
+    if (!isInvalid(dbRecord.display_name)) return dbRecord.display_name.trim();
+    if (!isInvalid(dbRecord.username)) {
+      return dbRecord.username
+        .replace(/[_.-]+/g, " ")
+        .split(" ")
+        .filter(Boolean)
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+    }
+  }
+
+  // 2. Supabase Auth User Metadata fields
+  if (authUser?.user_metadata) {
+    const meta = authUser.user_metadata;
+    if (!isInvalid(meta.name)) return meta.name.trim();
+    if (!isInvalid(meta.full_name)) return meta.full_name.trim();
+    if (!isInvalid(meta.display_name)) return meta.display_name.trim();
+    if (!isInvalid(meta.displayName)) return meta.displayName.trim();
+    if (!isInvalid(meta.username)) {
+      return meta.username
+        .replace(/[_.-]+/g, " ")
+        .split(" ")
+        .filter(Boolean)
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+    }
+  }
+
+  // 3. Email-derived Name
+  const email = dbRecord?.email || authUser?.email;
+  if (email && email.includes("@")) {
+    const fromEmail = formatNameFromEmail(email);
+    if (!isInvalid(fromEmail) && fromEmail !== "Campus Student") {
+      return fromEmail;
+    }
+  }
+
+  return fallback;
+}

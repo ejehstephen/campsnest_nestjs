@@ -50,7 +50,7 @@ import {
 import { fetchUserAnswersAction } from "@/lib/connect/actions";
 import { CONNECT_QUESTIONS } from "@/lib/connect/constants";
 import { HousingItem } from "@/lib/housing/constants";
-import { isVideoUrl } from "@/lib/utils";
+import { isVideoUrl, parseUserName, formatNameFromEmail } from "@/lib/utils";
 import { ImageLightboxModal } from "@/components/ui/image-lightbox-modal";
 
 export default function ProfilePage() {
@@ -132,20 +132,12 @@ export default function ProfilePage() {
   }, [profile?.id]);
 
   const resolvedName = React.useMemo(() => {
-    if (profile?.name && profile.name !== "New User" && profile.name !== "new user" && profile.name.trim() !== "") {
-      return profile.name;
-    }
-    if (profile?.email) {
-      const emailPrefix = profile.email.split("@")[0].replace(/[0-9]/g, " ").trim();
-      if (emailPrefix) {
-        return emailPrefix
-          .split(/\s+|_/)
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(" ");
-      }
-    }
-    return "Stephen Ekeson";
-  }, [profile?.name, profile?.email]);
+    return parseUserName(
+      profile,
+      null,
+      profile?.email ? formatNameFromEmail(profile.email) : "Campus Student"
+    );
+  }, [profile]);
 
   const displayName = resolvedName;
   const isInvalidAvatar = !profile?.profile_image || profile.profile_image.includes("example.com") || profile.profile_image.trim() === "";

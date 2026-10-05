@@ -4,6 +4,7 @@ import * as React from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { UserProfile } from "@/types/user.types";
+import { parseUserName, formatNameFromEmail } from "@/lib/utils";
 
 export const DEFAULT_DEMO_PROFILE: UserProfile = {
   id: "demo-student-id",
@@ -52,43 +53,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = React.useCallback(async (userId: string) => {
     try {
+      const { data: authData } = await supabase.auth.getUser();
+      const authUser = authData?.user;
+
       const { data, error } = await supabase
         .from("users")
         .select("*")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
+
+      const fallbackName = formatNameFromEmail(authUser?.email || data?.email);
+      const resolvedName = parseUserName(data, authUser, fallbackName);
 
       if (data && !error) {
-        let updatedProfile = data as UserProfile;
+        let updatedProfile = {
+          ...data,
+          name: resolvedName,
+        } as UserProfile;
 
-        // If DB has "New User" or empty name, check session user metadata full_name/name
-        if (!updatedProfile.name || updatedProfile.name === "New User" || updatedProfile.name === "new user") {
-          const { data: authData } = await supabase.auth.getUser();
-          const metaName = authData?.user?.user_metadata?.full_name || 
-                           authData?.user?.user_metadata?.name || 
-                           authData?.user?.user_metadata?.display_name;
-          if (metaName && metaName !== "New User" && metaName.trim() !== "") {
-            updatedProfile.name = metaName.trim();
-            // Sync back to users table in background
-            supabase.from("users").update({ name: metaName.trim() }).eq("id", userId).then();
-          } else if (authData?.user?.email) {
-            // If email is present (e.g. ejehstephen966@gmail.com -> Ejeh Stephen or prefix)
-            const emailPrefix = authData.user.email.split("@")[0].replace(/[0-9]/g, " ").trim();
-            if (emailPrefix) {
-              const formattedName = emailPrefix
-                .split(/\s+|_/)
-                .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                .join(" ");
-              updatedProfile.name = formattedName;
-              supabase.from("users").update({ name: formattedName }).eq("id", userId).then();
-            }
-          }
+        // If DB had a generic/empty name or differs from resolved name, sync back to users table
+        if (!data.name || data.name.trim().toLowerCase() === "new user" || data.name !== resolvedName) {
+          supabase.from("users").update({ name: resolvedName, updated_at: new Date().toISOString() }).eq("id", userId).then();
         }
 
         setProfile(updatedProfile);
         if (typeof window !== "undefined") {
           try {
             localStorage.setItem("campsnest_user_profile", JSON.stringify(updatedProfile));
+          } catch (e) {}
+        }
+      } else {
+        // User exists in auth.users (e.g. legacy Flutter account) but not yet in public.users table
+        const newRecord: UserProfile = {
+          id: userId,
+          name: resolvedName,
+          email: authUser?.email || "",
+          profile_image: authUser?.user_metadata?.avatar_url || authUser?.user_metadata?.profile_image || null,
+          school: authUser?.user_metadata?.school || "Federal University Wukari",
+          faculty: authUser?.user_metadata?.faculty || null,
+          department: authUser?.user_metadata?.department || null,
+          level: authUser?.user_metadata?.level || "300 Level",
+          age: Number(authUser?.user_metadata?.age) || 20,
+          gender: authUser?.user_metadata?.gender || "other",
+          phone_number: authUser?.user_metadata?.phone_number || null,
+          whatsapp_number: authUser?.user_metadata?.whatsapp_number || authUser?.user_metadata?.phone_number || null,
+          bio: authUser?.user_metadata?.bio || "Student on CampsNest.",
+          preferences: [],
+          role: "user",
+          is_banned: false,
+          is_verified: true,
+          is_super_admin: false,
+          privacy_show_profile: true,
+          privacy_show_marketplace: true,
+          privacy_allow_matching: true,
+          created_at: authUser?.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        // Create the missing public.users record for this legacy account
+        try {
+          await supabase.from("users").upsert({
+            id: userId,
+            name: resolvedName,
+            email: authUser?.email || "",
+            school: newRecord.school,
+            gender: newRecord.gender,
+            role: "user",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "id" });
+        } catch (syncErr) {
+          console.warn("Could not upsert legacy user profile to DB:", syncErr);
+        }
+
+        setProfile(newRecord);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("campsnest_user_profile", JSON.stringify(newRecord));
           } catch (e) {}
         }
       }

@@ -56,8 +56,20 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
 
   React.useEffect(() => {
     setMounted(true);
+
+    // 1. Immediately check custom local items
+    if (typeof window !== "undefined") {
+      try {
+        const localItems = JSON.parse(localStorage.getItem("campsnest_custom_market_items") || "[]");
+        const match = localItems.find((i: any) => i.id === params.id);
+        if (match) {
+          setDbItem(match);
+          setIsLoading(false);
+        }
+      } catch (e) {}
+    }
+
     const loadItem = async () => {
-      setIsLoading(true);
       try {
         const [res, allRes] = await Promise.all([
           fetchMarketItemByIdAction(params.id),

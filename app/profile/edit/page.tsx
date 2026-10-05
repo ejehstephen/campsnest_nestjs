@@ -19,7 +19,7 @@ import {
 import { AppShell } from "@/components/layout/app-shell";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { updateAcademicProfileAction } from "@/lib/auth/actions";
-import { compressAvatarImage } from "@/lib/utils";
+import { compressAvatarImage, parseUserName, formatNameFromEmail } from "@/lib/utils";
 
 const VIBE_TAG_OPTIONS = [
   "Night Owl 🌙",
@@ -38,10 +38,12 @@ export default function EditProfilePage() {
   const router = useRouter();
   const { profile, refreshProfile } = useAuth();
 
+  const initialName = parseUserName(profile, null, profile?.email ? formatNameFromEmail(profile.email) : "Campus Student");
+
   // Form State
-  const [fullName, setFullName] = React.useState(profile?.name || "Stephen Ekeson");
+  const [fullName, setFullName] = React.useState(initialName);
   const [username, setUsername] = React.useState(
-    (profile?.name || "stephen_ek").toLowerCase().replace(/\s+/g, "_")
+    initialName.toLowerCase().replace(/[^a-z0-9_]/g, "").replace(/\s+/g, "_") || "student"
   );
   const [department, setDepartment] = React.useState(profile?.department || "B.Sc Computer Science");
   const [level, setLevel] = React.useState(profile?.level || "300 Level");
@@ -66,20 +68,9 @@ export default function EditProfilePage() {
 
   React.useEffect(() => {
     if (profile) {
-      if (profile.name && profile.name !== "New User" && profile.name !== "new user") {
-        setFullName(profile.name);
-        setUsername(profile.name.toLowerCase().replace(/[^a-z0-9_]/g, "").replace(/\s+/g, "_"));
-      } else if (profile.email) {
-        const emailPrefix = profile.email.split("@")[0].replace(/[0-9]/g, " ").trim();
-        if (emailPrefix) {
-          const formatted = emailPrefix
-            .split(/\s+|_/)
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ");
-          setFullName(formatted);
-          setUsername(emailPrefix.toLowerCase().replace(/\s+/g, "_"));
-        }
-      }
+      const parsed = parseUserName(profile, null, profile.email ? formatNameFromEmail(profile.email) : "Campus Student");
+      setFullName(parsed);
+      setUsername(parsed.toLowerCase().replace(/[^a-z0-9_]/g, "").replace(/\s+/g, "_") || "student");
       if (profile.department) setDepartment(profile.department);
       if (profile.level) setLevel(profile.level);
       if (profile.phone_number) setPhone(profile.phone_number);

@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Avatar } from "@/components/ui/avatar";
 import { sanitizeUUID } from "@/lib/utils";
 import { fetchUserConversationsAction } from "@/lib/messages/actions";
+import { useAuth } from "@/lib/auth/auth-provider";
 
 export interface ConversationSummary {
   id: string;
@@ -27,6 +28,7 @@ export interface ConversationSummary {
 let globalConversationsCache: ConversationSummary[] | null = null;
 
 export default function MessagesPage() {
+  const { profile } = useAuth();
   const [conversations, setConversations] = React.useState<ConversationSummary[]>(
     () => globalConversationsCache || []
   );
@@ -46,14 +48,15 @@ export default function MessagesPage() {
       }
 
       try {
-        // 1. Fetch live conversations from Supabase
+        // 1. Fetch live conversations belonging strictly to current user from Supabase
         const dbRes = await fetchUserConversationsAction();
         const dbList: ConversationSummary[] = dbRes.success && dbRes.conversations ? dbRes.conversations : [];
 
-        // 2. Read locally cached / offline dynamic conversations
+        // 2. Read locally cached dynamic conversations for this specific user
         let localList: ConversationSummary[] = [];
         if (typeof window !== "undefined") {
-          const raw = localStorage.getItem("campsnest_dynamic_conversations");
+          const userKey = profile?.id ? `campsnest_dynamic_conversations_${profile.id}` : null;
+          const raw = userKey ? localStorage.getItem(userKey) : null;
           if (raw) {
             try {
               localList = JSON.parse(raw);
@@ -108,7 +111,7 @@ export default function MessagesPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [profile?.id]);
 
   const filteredConversations = conversations.filter((conv) => {
     if (filterType !== "all" && conv.context.type !== filterType) return false;
