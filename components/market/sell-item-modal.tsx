@@ -38,7 +38,9 @@ export interface PublishedItem {
   postedTime: string;
   image: string;
   images?: string[];
+  seller_id?: string;
   seller: {
+    id?: string;
     name: string;
     level: string;
     avatar: string;
@@ -204,7 +206,9 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
       image: coverPhoto,
       images: finalImages,
       school: finalSchool,
+      seller_id: profile?.id,
       seller: {
+        id: profile?.id,
         name: profile?.name || "Verified Student",
         level: profile?.level || "300 Level",
         avatar: sellerAvatar,

@@ -29,12 +29,14 @@ import {
   Mail,
   Copy,
   GraduationCap,
-  Search
+  Search,
+  Loader2
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import { APP_CONFIG, CAMPUS_LIST } from "@/lib/constants";
+import { deleteAccountAction } from "@/lib/auth/actions";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -61,6 +63,45 @@ export default function SettingsPage() {
   const [isSafetyZonesModalOpen, setIsSafetyZonesModalOpen] = React.useState(false);
   const [isCampusModalOpen, setIsCampusModalOpen] = React.useState(false);
   const [copiedEmail, setCopiedEmail] = React.useState(false);
+
+  // Danger Zone: Delete Account
+  const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = React.useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = React.useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmationText.trim().toUpperCase() !== "DELETE") {
+      showToast("Please type DELETE to confirm account deletion.");
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      await deleteAccountAction();
+
+      // Clear all local data
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.removeItem("campsnest_session_user");
+          localStorage.removeItem("campsnest_user_profile");
+          localStorage.removeItem("campsnest_custom_lodges");
+          localStorage.removeItem("campsnest_custom_market_items");
+          localStorage.removeItem("campsnest_saved_housing");
+          localStorage.removeItem("campsnest_local_market_items");
+          localStorage.removeItem("campsnest_local_housing_items");
+          localStorage.removeItem("campsnest_questionnaire_answers");
+        } catch (e) {}
+      }
+
+      await signOut();
+      router.push("/login?deleted=true");
+    } catch (err: any) {
+      console.error("Delete account error:", err);
+      showToast("Failed to delete account. Please try again.");
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
 
   // Load persistent settings on mount
   React.useEffect(() => {
@@ -656,6 +697,40 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* --------------------------------------------------------------------- */}
+          {/* SECTION 8: DANGER ZONE (DELETE ACCOUNT) */}
+          {/* --------------------------------------------------------------------- */}
+          <div className="p-5 sm:p-6 rounded-3xl bg-rose-950/20 border border-rose-500/25 space-y-4 shadow-xl">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-rose-400" />
+              <h2 className="text-xs font-heading font-extrabold uppercase tracking-wider text-rose-300">
+                Danger Zone
+              </h2>
+            </div>
+
+            <p className="text-xs text-text-secondary leading-relaxed">
+              Permanently delete your CampsNest account, room listings, marketplace products, and chat records. This action cannot be undone.
+            </p>
+
+            <div className="pt-1 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-xs font-bold text-white block">Delete Student Account</span>
+                <span className="text-[11px] text-text-dim block">Irreversible deletion of all personal data</span>
+              </div>
+
+              <button
+                onClick={() => {
+                  setDeleteConfirmationText("");
+                  setIsDeleteAccountModalOpen(true);
+                }}
+                className="px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all flex items-center gap-1.5 active:scale-95"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Account</span>
+              </button>
+            </div>
+          </div>
+
         </div>
 
         {/* ========================================================================= */}
@@ -861,6 +936,83 @@ export default function SettingsPage() {
                   className="px-4 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-white font-semibold transition-all"
                 >
                   Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* MODAL 4: DELETE ACCOUNT CONFIRMATION */}
+        {/* ========================================================================= */}
+        {isDeleteAccountModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+            <div className="w-full max-w-md rounded-3xl bg-[#1A1535] border border-rose-500/30 p-6 space-y-4 shadow-2xl animate-scale-up text-left">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-rose-400">
+                  <div className="h-9 w-9 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-base font-heading font-extrabold text-white">
+                    Delete CampsNest Account
+                  </h3>
+                </div>
+                <button
+                  onClick={() => !isDeletingAccount && setIsDeleteAccountModalOpen(false)}
+                  className="p-1 rounded-full hover:bg-white/10 text-text-dim hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-1.5 text-xs text-rose-300">
+                <p className="font-bold flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>Warning: This action is permanent!</span>
+                </p>
+                <p className="text-[11px] text-text-secondary leading-relaxed">
+                  All your active room listings, marketplace products, in-app messages, saved lodges, and student profile verification will be immediately wiped.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-text-dim block">
+                  To confirm, type <strong className="text-white font-mono bg-white/10 px-1.5 py-0.5 rounded">DELETE</strong> below:
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmationText}
+                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                  placeholder="Type DELETE to confirm"
+                  className="w-full h-11 rounded-2xl bg-white/[0.05] border border-white/15 px-3.5 text-xs text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  autoFocus
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  onClick={() => setIsDeleteAccountModalOpen(false)}
+                  disabled={isDeletingAccount}
+                  className="px-4 py-2.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-xs font-semibold text-text-dim hover:text-white transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={isDeletingAccount || deleteConfirmationText.trim().toUpperCase() !== "DELETE"}
+                  className="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isDeletingAccount ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Deleting Account...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Permanently Delete</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

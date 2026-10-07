@@ -25,7 +25,9 @@ import {
   Check,
   Share2,
   X,
-  GraduationCap
+  GraduationCap,
+  Trash2,
+  Loader2
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -34,7 +36,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SellItemModal, PublishedItem } from "@/components/market/sell-item-modal";
 import { ShareModal } from "@/components/common/share-modal";
-import { fetchMarketItemsAction } from "@/lib/market/actions";
+import { fetchMarketItemsAction, deleteMarketItemAction } from "@/lib/market/actions";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { CAMPUS_LIST } from "@/lib/constants";
 import { MARKET_CATEGORIES, MARKET_PRODUCTS, MarketItem } from "@/lib/market/constants";
@@ -50,6 +52,38 @@ export default function MarketPage() {
   const [products, setProducts] = React.useState<MarketItem[]>([]);
   const [isSellModalOpen, setIsSellModalOpen] = React.useState(false);
   const [shareItem, setShareItem] = React.useState<MarketItem | null>(null);
+  const [deleteItemTarget, setDeleteItemTarget] = React.useState<MarketItem | null>(null);
+  const [isDeletingItem, setIsDeletingItem] = React.useState(false);
+
+  const confirmDeleteItem = async () => {
+    if (!deleteItemTarget) return;
+    setIsDeletingItem(true);
+    try {
+      await deleteMarketItemAction(deleteItemTarget.id);
+
+      // Remove from active state
+      setProducts((prev) => prev.filter((p) => p.id !== deleteItemTarget.id));
+
+      // Remove from client local storage
+      if (typeof window !== "undefined") {
+        try {
+          const localItems = JSON.parse(localStorage.getItem("campsnest_custom_market_items") || "[]");
+          const updated = localItems.filter((i: any) => i.id !== deleteItemTarget.id);
+          localStorage.setItem("campsnest_custom_market_items", JSON.stringify(updated));
+
+          const localMarket = JSON.parse(localStorage.getItem("campsnest_local_market_items") || "[]");
+          const updatedMarket = localMarket.filter((i: any) => i.id !== deleteItemTarget.id);
+          localStorage.setItem("campsnest_local_market_items", JSON.stringify(updatedMarket));
+        } catch (e) {}
+      }
+
+      setDeleteItemTarget(null);
+    } catch (err) {
+      console.warn("Could not delete market item:", err);
+    } finally {
+      setIsDeletingItem(false);
+    }
+  };
 
   // Load campus and listen to changes
   React.useEffect(() => {
@@ -124,7 +158,9 @@ export default function MarketPage() {
           postedTime: "Just now",
           image: item.image || (item.images && item.images[0]) || "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&auto=format&fit=crop&q=80",
           images: item.images && item.images.length > 0 ? item.images : item.image ? [item.image] : [],
+          seller_id: item.seller_id,
           seller: {
+            id: item.seller_id,
             name: item.seller_name || "Verified Student",
             level: item.seller_level || "300 Level",
             avatar: item.seller_avatar && !item.seller_avatar.includes("example.com")
@@ -299,6 +335,13 @@ export default function MarketPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5 w-full">
             {filteredProducts.map((item) => {
               const isSaved = savedItems.includes(item.id);
+              const isOwner = Boolean(
+                profile?.id && (
+                  item.seller_id === profile.id ||
+                  item.seller?.id === profile.id ||
+                  (item.seller?.whatsapp && profile.whatsapp_number && item.seller.whatsapp === profile.whatsapp_number)
+                )
+              );
               const hasDiscount = item.originalPrice && item.originalPrice > item.price;
               const discountPercent = hasDiscount
                 ? Math.round(((item.originalPrice! - item.price) / item.originalPrice!) * 100)
@@ -326,20 +369,38 @@ export default function MarketPage() {
                           {item.conditionBadge}
                         </span>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleBookmark(item.id);
-                          }}
-                          className={`pointer-events-auto h-7 w-7 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${isSaved
-                              ? "bg-brand-magenta text-white border-brand-magenta shadow-glow-magenta"
-                              : "bg-black/60 hover:bg-black/80 text-white border-white/20"
+                        <div className="flex items-center gap-1 pointer-events-auto">
+                          {isOwner && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDeleteItemTarget(item);
+                              }}
+                              className="h-7 w-7 rounded-full bg-rose-600/90 hover:bg-rose-500 text-white backdrop-blur-md border border-rose-400/50 flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-md"
+                              title="Delete your item listing"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleBookmark(item.id);
+                            }}
+                            className={`h-7 w-7 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
+                              isSaved
+                                ? "bg-brand-magenta text-white border-brand-magenta shadow-glow-magenta"
+                                : "bg-black/60 hover:bg-black/80 text-white border-white/20"
                             }`}
-                        >
-                          <Bookmark className={`h-3.5 w-3.5 ${isSaved ? "fill-white" : ""}`} />
-                        </button>
+                          >
+                            <Bookmark className={`h-3.5 w-3.5 ${isSaved ? "fill-white" : ""}`} />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Location Pill */}
@@ -395,19 +456,34 @@ export default function MarketPage() {
                       </span>
                     </Link>
 
-                    {/* Direct Contact Seller via WhatsApp (Gradient Button) */}
-                    <a
-                      href={`https://wa.me/${item.seller.whatsapp || "2348134351762"}?text=Hello%20${encodeURIComponent(item.seller.name)},%20I%20am%20interested%20in%20buying%20"${encodeURIComponent(item.title)}"%20for%20₦${item.price.toLocaleString()}%20on%20CampsNest.`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button className="py-1.5 px-3 rounded-full bg-gradient-to-r from-brand-violet via-[#A855F7] to-brand-magenta text-white text-[11px] font-bold shadow-[0_2px_10px_rgba(236,72,153,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center gap-1 cursor-pointer">
-                        <MessageSquare className="h-3 w-3" />
-                        <span>Chat</span>
+                    {/* Direct Contact Seller via WhatsApp OR Delete if Owner */}
+                    {isOwner ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDeleteItemTarget(item);
+                        }}
+                        className="py-1 px-2.5 rounded-full bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95 shrink-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        <span>Delete</span>
                       </button>
-                    </a>
+                    ) : (
+                      <a
+                        href={`https://wa.me/${item.seller.whatsapp || "2348134351762"}?text=Hello%20${encodeURIComponent(item.seller.name)},%20I%20am%20interested%20in%20buying%20"${encodeURIComponent(item.title)}"%20for%20₦${item.price.toLocaleString()}%20on%20CampsNest.`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button className="py-1.5 px-3 rounded-full bg-gradient-to-r from-brand-violet via-[#A855F7] to-brand-magenta text-white text-[11px] font-bold shadow-[0_2px_10px_rgba(236,72,153,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center gap-1 cursor-pointer">
+                          <MessageSquare className="h-3 w-3" />
+                          <span>Chat</span>
+                        </button>
+                      </a>
+                    )}
                   </div>
                 </GlassCard>
               );
@@ -476,6 +552,74 @@ export default function MarketPage() {
             url={typeof window !== "undefined" ? `${window.location.origin}/market` : ""}
             description={`Check out ${shareItem.title} for ₦${shareItem.price.toLocaleString()} in ${selectedCampus?.name || "campus"} on CampsNest.`}
           />
+        )}
+
+        {/* Delete Market Item Confirmation Modal */}
+        {deleteItemTarget && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="w-full max-w-md rounded-3xl bg-[#1A1535] border border-rose-500/30 p-6 space-y-4 shadow-2xl animate-scale-up text-left">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 text-rose-400">
+                  <div className="h-9 w-9 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-base font-heading font-extrabold text-white">
+                    Delete Market Listing
+                  </h3>
+                </div>
+                <button
+                  onClick={() => !isDeletingItem && setDeleteItemTarget(null)}
+                  className="p-1 rounded-full hover:bg-white/10 text-text-dim hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-3">
+                <img
+                  src={deleteItemTarget.image}
+                  alt={deleteItemTarget.title}
+                  className="h-12 w-12 rounded-xl object-cover shrink-0"
+                />
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-white truncate">{deleteItemTarget.title}</h4>
+                  <p className="text-[11px] text-text-dim truncate">{deleteItemTarget.location}</p>
+                  <p className="text-xs font-extrabold text-emerald-400">₦{deleteItemTarget.price.toLocaleString()}</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Are you sure you want to delete this marketplace item? It will be permanently removed from the student marketplace feed.
+              </p>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  onClick={() => setDeleteItemTarget(null)}
+                  disabled={isDeletingItem}
+                  className="px-4 py-2.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-xs font-semibold text-text-dim hover:text-white transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteItem}
+                  disabled={isDeletingItem}
+                  className="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isDeletingItem ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Delete Item</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
       </div>

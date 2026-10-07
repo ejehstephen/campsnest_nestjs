@@ -35,7 +35,10 @@ import {
   Flame,
   Search,
   MessageSquare,
-  Maximize2
+  Maximize2,
+  Trash2,
+  Loader2,
+  X
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +53,8 @@ import {
 import { fetchUserAnswersAction } from "@/lib/connect/actions";
 import { CONNECT_QUESTIONS } from "@/lib/connect/constants";
 import { HousingItem } from "@/lib/housing/constants";
+import { deleteHousingListingAction } from "@/lib/housing/actions";
+import { deleteMarketItemAction } from "@/lib/market/actions";
 import { isVideoUrl, parseUserName, formatNameFromEmail } from "@/lib/utils";
 import { ImageLightboxModal } from "@/components/ui/image-lightbox-modal";
 
@@ -58,6 +63,42 @@ export default function ProfilePage() {
   const [mounted, setMounted] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"listings" | "saved" | "vibe" | "inspections">("listings");
   const [isViewingAvatar, setIsViewingAvatar] = React.useState(false);
+  const [deleteListingTarget, setDeleteListingTarget] = React.useState<ProfileListingItem | null>(null);
+  const [isDeletingListing, setIsDeletingListing] = React.useState(false);
+
+  const confirmDeleteProfileListing = async () => {
+    if (!deleteListingTarget) return;
+    setIsDeletingListing(true);
+    try {
+      if (deleteListingTarget.type === "housing") {
+        await deleteHousingListingAction(deleteListingTarget.id);
+        if (typeof window !== "undefined") {
+          try {
+            const lodges = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
+            localStorage.setItem("campsnest_custom_lodges", JSON.stringify(lodges.filter((l: any) => l.id !== deleteListingTarget.id)));
+            const hList = JSON.parse(localStorage.getItem("campsnest_local_housing_items") || "[]");
+            localStorage.setItem("campsnest_local_housing_items", JSON.stringify(hList.filter((h: any) => h.id !== deleteListingTarget.id)));
+          } catch (e) {}
+        }
+      } else {
+        await deleteMarketItemAction(deleteListingTarget.id);
+        if (typeof window !== "undefined") {
+          try {
+            const mItems = JSON.parse(localStorage.getItem("campsnest_custom_market_items") || "[]");
+            localStorage.setItem("campsnest_custom_market_items", JSON.stringify(mItems.filter((i: any) => i.id !== deleteListingTarget.id)));
+            const mLocal = JSON.parse(localStorage.getItem("campsnest_local_market_items") || "[]");
+            localStorage.setItem("campsnest_local_market_items", JSON.stringify(mLocal.filter((i: any) => i.id !== deleteListingTarget.id)));
+          } catch (e) {}
+        }
+      }
+      setUserListings((prev) => prev.filter((item) => item.id !== deleteListingTarget.id));
+      setDeleteListingTarget(null);
+    } catch (err) {
+      console.error("Delete listing error:", err);
+    } finally {
+      setIsDeletingListing(false);
+    }
+  };
 
   // Dynamic Data States
   const [userListings, setUserListings] = React.useState<ProfileListingItem[]>([]);
@@ -395,12 +436,22 @@ export default function ProfilePage() {
                             )}
                           </div>
 
-                          <Link
-                            href={item.type === "housing" ? `/housing/${item.id}` : `/market/${item.id}`}
-                            className="p-1 rounded-lg hover:bg-white/[0.08] text-text-dim hover:text-white transition-colors"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Link>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setDeleteListingTarget(item)}
+                              className="p-1 rounded-lg hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition-colors"
+                              title="Delete listing"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                            <Link
+                              href={item.type === "housing" ? `/housing/${item.id}` : `/market/${item.id}`}
+                              className="p-1 rounded-lg hover:bg-white/[0.08] text-text-dim hover:text-white transition-colors"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Link>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -708,6 +759,74 @@ export default function ProfilePage() {
           subtitle={`${displayDepartment} • ${displaySchool}`}
           badge="Verified Student ID"
         />
+
+        {/* Delete Listing Confirmation Modal */}
+        {deleteListingTarget && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="w-full max-w-md rounded-3xl bg-[#1A1535] border border-rose-500/30 p-6 space-y-4 shadow-2xl animate-scale-up text-left">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 text-rose-400">
+                  <div className="h-9 w-9 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-base font-heading font-extrabold text-white">
+                    Delete {deleteListingTarget.type === "housing" ? "Lodge Listing" : "Market Item"}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => !isDeletingListing && setDeleteListingTarget(null)}
+                  className="p-1 rounded-full hover:bg-white/10 text-text-dim hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-3">
+                <img
+                  src={deleteListingTarget.image}
+                  alt={deleteListingTarget.title}
+                  className="h-12 w-12 rounded-xl object-cover shrink-0"
+                />
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-white truncate">{deleteListingTarget.title}</h4>
+                  <p className="text-[11px] text-text-dim truncate">{deleteListingTarget.subtitle}</p>
+                  <p className="text-xs font-extrabold text-emerald-400">₦{deleteListingTarget.price.toLocaleString()}</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Are you sure you want to delete this {deleteListingTarget.type === "housing" ? "property listing" : "marketplace product"}? It will be permanently removed.
+              </p>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  onClick={() => setDeleteListingTarget(null)}
+                  disabled={isDeletingListing}
+                  className="px-4 py-2.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-xs font-semibold text-text-dim hover:text-white transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteProfileListing}
+                  disabled={isDeletingListing}
+                  className="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isDeletingListing ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Delete</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </AppShell>

@@ -34,19 +34,22 @@ import {
   Flag,
   Loader2,
   X,
-  Play
+  Play,
+  Trash2
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { Avatar } from "@/components/ui/avatar";
 import { ReportModal } from "@/components/common/report-modal";
 import { ShareModal } from "@/components/common/share-modal";
-import { fetchHousingListingByIdAction, bookInspectionAction } from "@/lib/housing/actions";
+import { fetchHousingListingByIdAction, bookInspectionAction, deleteHousingListingAction } from "@/lib/housing/actions";
 import { HOUSING_LISTINGS, HousingItem } from "@/lib/housing/constants";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { parseUserName } from "@/lib/utils";
 import { isVideoUrl } from "@/lib/utils";
 
 export default function HousingDetailPage({ params }: { params: { id: string } }) {
+  const router = useRouter();
   const { profile } = useAuth();
   const [mounted, setMounted] = React.useState(false);
   const [isBookmarked, setIsBookmarked] = React.useState(false);
@@ -54,6 +57,8 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
   const [inspectionModalOpen, setInspectionModalOpen] = React.useState(false);
   const [reportModalOpen, setReportModalOpen] = React.useState(false);
   const [shareModalOpen, setShareModalOpen] = React.useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
   const [dbHouse, setDbHouse] = React.useState<any | null>(null);
 
   // Inspection Form State
@@ -264,6 +269,35 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
     setActivePhoto((prev) => (prev < galleryImages.length - 1 ? prev + 1 : 0));
   };
 
+  const isOwner = Boolean(
+    profile?.id && (
+      house.owner_id === profile.id ||
+      house.owner?.id === profile.id ||
+      (house.host?.phone && profile.phone_number && house.host.phone === profile.phone_number)
+    )
+  );
+
+  const handleDeleteListing = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteHousingListingAction(params.id);
+      if (typeof window !== "undefined") {
+        try {
+          const localLodges = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
+          localStorage.setItem("campsnest_custom_lodges", JSON.stringify(localLodges.filter((h: any) => h.id !== params.id)));
+
+          const localHousing = JSON.parse(localStorage.getItem("campsnest_local_housing_items") || "[]");
+          localStorage.setItem("campsnest_local_housing_items", JSON.stringify(localHousing.filter((h: any) => h.id !== params.id)));
+        } catch (e) {}
+      }
+      router.push("/housing");
+    } catch (err) {
+      console.error("Delete house failed:", err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <AppShell>
       <div className="space-y-6 pb-24 max-w-7xl mx-auto">
@@ -295,6 +329,16 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
 
           {/* Action buttons on Right */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {isOwner && (
+              <button
+                onClick={() => setIsDeleteModalOpen(true)}
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-[11px] sm:text-xs font-bold transition-all shadow-md active:scale-95"
+                title="Delete this listing"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete</span>
+              </button>
+            )}
             <button
               onClick={() => setReportModalOpen(true)}
               className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] sm:text-xs font-bold transition-all"
@@ -567,6 +611,16 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
                     </button>
                   </a>
                 )}
+
+                {isOwner && (
+                  <button
+                    onClick={() => setIsDeleteModalOpen(true)}
+                    className="w-full py-3 px-4 rounded-full bg-rose-600/20 hover:bg-rose-600 border border-rose-500/40 hover:border-rose-500 text-rose-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-lg"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Delete This Lodge Listing</span>
+                  </button>
+                )}
               </div>
 
               {/* Safety Footnote */}
@@ -658,6 +712,74 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
           targetTitle={title}
           targetType="listing"
         />
+
+        {/* Delete Lodge Listing Modal */}
+        {isDeleteModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="w-full max-w-md rounded-3xl bg-[#1A1535] border border-rose-500/30 p-6 space-y-4 shadow-2xl animate-scale-up text-left">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 text-rose-400">
+                  <div className="h-9 w-9 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-base font-heading font-extrabold text-white">
+                    Delete Lodge Listing
+                  </h3>
+                </div>
+                <button
+                  onClick={() => !isDeleting && setIsDeleteModalOpen(false)}
+                  className="p-1 rounded-full hover:bg-white/10 text-text-dim hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-3">
+                <img
+                  src={galleryImages[0]?.url || house.image}
+                  alt={title}
+                  className="h-12 w-12 rounded-xl object-cover shrink-0"
+                />
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-white truncate">{title}</h4>
+                  <p className="text-[11px] text-text-dim truncate">{address}</p>
+                  <p className="text-xs font-extrabold text-emerald-400">₦{price.toLocaleString()}/yr</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Are you sure you want to permanently delete this accommodation listing? Students will no longer be able to find, inspect, or message you about this property.
+              </p>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  disabled={isDeleting}
+                  className="px-4 py-2.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-xs font-semibold text-text-dim hover:text-white transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteListing}
+                  disabled={isDeleting}
+                  className="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Delete Property</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </AppShell>

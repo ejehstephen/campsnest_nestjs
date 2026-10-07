@@ -45,6 +45,7 @@ export interface PublishedHouse {
   images?: string[];
   description?: string;
   school?: string;
+  owner_id?: string;
   features: { label: string; icon: any }[];
   host: {
     initials: string;
@@ -195,6 +196,7 @@ export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: Po
         return { label: option ? option.label.split("/")[0].trim() : aId, icon: Building2 };
       }),
       school: finalSchool,
+      owner_id: profile?.id,
       host: {
         initials: profile?.name ? profile.name.slice(0, 2).toUpperCase() : "SH",
         name: profile?.name || "Student Host",

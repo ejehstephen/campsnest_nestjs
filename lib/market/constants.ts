@@ -13,7 +13,9 @@ export interface MarketItem {
   postedTime: string;
   image: string;
   images?: string[];
+  seller_id?: string;
   seller: {
+    id?: string;
     name: string;
     level: string;
     avatar: string;

@@ -25,6 +25,8 @@ export interface HousingItem {
   images?: string[];
   description?: string;
   school?: string;
+  owner_id?: string;
+  owner?: any;
   features: { label: string; icon: any }[];
   host: {
     initials: string;

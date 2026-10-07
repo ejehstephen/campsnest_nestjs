@@ -33,7 +33,10 @@ import {
   X,
   Play,
   GraduationCap,
-  Globe
+  Globe,
+  Trash2,
+  Loader2,
+  AlertTriangle
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -43,7 +46,7 @@ import { Button } from "@/components/ui/button";
 import { PostHouseModal, PublishedHouse } from "@/components/housing/post-house-modal";
 import { isVideoUrl, parseUserName } from "@/lib/utils";
 import { ShareModal } from "@/components/common/share-modal";
-import { fetchHousingListingsAction } from "@/lib/housing/actions";
+import { fetchHousingListingsAction, deleteHousingListingAction } from "@/lib/housing/actions";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { CAMPUS_LIST } from "@/lib/constants";
 import { 
@@ -81,6 +84,38 @@ export default function HousingDiscoveryPage() {
   const [isPostModalOpen, setIsPostModalOpen] = React.useState(false);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = React.useState(false);
   const [shareHouse, setShareHouse] = React.useState<HousingItem | null>(null);
+  const [deleteHouseTarget, setDeleteHouseTarget] = React.useState<HousingItem | null>(null);
+  const [isDeletingHouse, setIsDeletingHouse] = React.useState(false);
+
+  const confirmDeleteHouse = async () => {
+    if (!deleteHouseTarget) return;
+    setIsDeletingHouse(true);
+    try {
+      await deleteHousingListingAction(deleteHouseTarget.id);
+      
+      // Remove from active state
+      setHousingListings((prev) => prev.filter((h) => h.id !== deleteHouseTarget.id));
+
+      // Remove from client local storages
+      if (typeof window !== "undefined") {
+        try {
+          const localLodges = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
+          const updatedLodges = localLodges.filter((h: any) => h.id !== deleteHouseTarget.id);
+          localStorage.setItem("campsnest_custom_lodges", JSON.stringify(updatedLodges));
+
+          const localHousing = JSON.parse(localStorage.getItem("campsnest_local_housing_items") || "[]");
+          const updatedHousing = localHousing.filter((h: any) => h.id !== deleteHouseTarget.id);
+          localStorage.setItem("campsnest_local_housing_items", JSON.stringify(updatedHousing));
+        } catch (e) {}
+      }
+
+      setDeleteHouseTarget(null);
+    } catch (err) {
+      console.warn("Could not delete house:", err);
+    } finally {
+      setIsDeletingHouse(false);
+    }
+  };
 
   // Load campus and listen to changes
   React.useEffect(() => {
@@ -198,6 +233,8 @@ export default function HousingDiscoveryPage() {
               images: dbImages.length > 0 ? dbImages : [primaryImg],
               description: item.description,
               school: item.school || ownerRecord?.school || (item.location?.toLowerCase().includes("wukari") ? "Federal University Wukari" : (selectedCampus?.name || "Campus")),
+              owner_id: item.owner_id || ownerRecord?.id,
+              owner: ownerRecord,
               room_listing_amenities: item.room_listing_amenities,
               amenities: dbAmenityList,
               features: dynamicFeatures,
@@ -445,6 +482,13 @@ export default function HousingDiscoveryPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredListings.map((house) => {
               const isSaved = savedNests.includes(house.id);
+              const isOwner = Boolean(
+                profile?.id && (
+                  house.owner_id === profile.id ||
+                  house.owner?.id === profile.id ||
+                  (house.host?.phone && profile.phone_number && house.host.phone === profile.phone_number)
+                )
+              );
               const hasVideo = isVideoUrl(house.image) || (house.images && house.images.some(img => isVideoUrl(img)));
               const videoSrc = isVideoUrl(house.image) ? house.image : (house.images?.find(img => isVideoUrl(img)) || "");
 
@@ -490,19 +534,36 @@ export default function HousingDiscoveryPage() {
                           {house.categoryBadge}
                         </Badge>
 
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            toggleBookmark(house.id);
-                          }}
-                          className={`pointer-events-auto p-2 rounded-full backdrop-blur-md border transition-all ${
-                            isSaved
-                              ? "bg-brand-magenta text-white border-brand-magenta shadow-glow-magenta"
-                              : "bg-black/50 hover:bg-black/80 text-white border-white/20"
-                          }`}
-                        >
-                          <Bookmark className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5 pointer-events-auto">
+                          {isOwner && (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDeleteHouseTarget(house);
+                              }}
+                              className="p-2 rounded-full bg-rose-600/90 hover:bg-rose-500 text-white backdrop-blur-md border border-rose-400/50 shadow-lg hover:scale-110 active:scale-95 transition-all"
+                              title="Delete your lodge listing"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleBookmark(house.id);
+                            }}
+                            className={`p-2 rounded-full backdrop-blur-md border transition-all ${
+                              isSaved
+                                ? "bg-brand-magenta text-white border-brand-magenta shadow-glow-magenta"
+                                : "bg-black/50 hover:bg-black/80 text-white border-white/20"
+                            }`}
+                          >
+                            <Bookmark className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Distance & Proximity Pill */}
@@ -649,6 +710,74 @@ export default function HousingDiscoveryPage() {
             url={typeof window !== "undefined" ? `${window.location.origin}/housing/${shareHouse.id}` : ""}
             description={`Check out ${shareHouse.title} for ₦${shareHouse.price.toLocaleString()} in ${selectedCampus?.name || "campus"} on CampsNest.`}
           />
+        )}
+
+        {/* Delete House Listing Confirmation Modal */}
+        {deleteHouseTarget && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="w-full max-w-md rounded-3xl bg-[#1A1535] border border-rose-500/30 p-6 space-y-4 shadow-2xl animate-scale-up text-left">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 text-rose-400">
+                  <div className="h-9 w-9 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-base font-heading font-extrabold text-white">
+                    Delete Lodge Listing
+                  </h3>
+                </div>
+                <button
+                  onClick={() => !isDeletingHouse && setDeleteHouseTarget(null)}
+                  className="p-1 rounded-full hover:bg-white/10 text-text-dim hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-3">
+                <img
+                  src={deleteHouseTarget.image}
+                  alt={deleteHouseTarget.title}
+                  className="h-12 w-12 rounded-xl object-cover shrink-0"
+                />
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-white truncate">{deleteHouseTarget.title}</h4>
+                  <p className="text-[11px] text-text-dim truncate">{deleteHouseTarget.address}</p>
+                  <p className="text-xs font-extrabold text-emerald-400">₦{deleteHouseTarget.price.toLocaleString()}/yr</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Are you sure you want to permanently delete this accommodation listing? Students will no longer be able to find, inspect, or message you about this property.
+              </p>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  onClick={() => setDeleteHouseTarget(null)}
+                  disabled={isDeletingHouse}
+                  className="px-4 py-2.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-xs font-semibold text-text-dim hover:text-white transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteHouse}
+                  disabled={isDeletingHouse}
+                  className="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isDeletingHouse ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Delete Property</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
       </div>
