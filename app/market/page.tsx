@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button";
 import { SellItemModal, PublishedItem } from "@/components/market/sell-item-modal";
 import { ShareModal } from "@/components/common/share-modal";
 import { fetchMarketItemsAction, deleteMarketItemAction } from "@/lib/market/actions";
+import { isListingDeleted, recordDeletedListingId, checkIsListingOwner, normalizePhoneNumber } from "@/lib/listing-storage";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { CAMPUS_LIST } from "@/lib/constants";
 import { MARKET_CATEGORIES, MARKET_PRODUCTS, MarketItem } from "@/lib/market/constants";
@@ -58,24 +59,17 @@ export default function MarketPage() {
   const confirmDeleteItem = async () => {
     if (!deleteItemTarget) return;
     setIsDeletingItem(true);
+    const targetId = String(deleteItemTarget.id);
+
     try {
-      await deleteMarketItemAction(deleteItemTarget.id);
+      // 1. Permanently blacklist and purge locally across storage
+      recordDeletedListingId(targetId);
 
-      // Remove from active state
-      setProducts((prev) => prev.filter((p) => p.id !== deleteItemTarget.id));
+      // 2. Remove immediately from React state
+      setProducts((prev) => prev.filter((p) => String(p.id) !== targetId));
 
-      // Remove from client local storage
-      if (typeof window !== "undefined") {
-        try {
-          const localItems = JSON.parse(localStorage.getItem("campsnest_custom_market_items") || "[]");
-          const updated = localItems.filter((i: any) => i.id !== deleteItemTarget.id);
-          localStorage.setItem("campsnest_custom_market_items", JSON.stringify(updated));
-
-          const localMarket = JSON.parse(localStorage.getItem("campsnest_local_market_items") || "[]");
-          const updatedMarket = localMarket.filter((i: any) => i.id !== deleteItemTarget.id);
-          localStorage.setItem("campsnest_local_market_items", JSON.stringify(updatedMarket));
-        } catch (e) {}
-      }
+      // 3. Mark as deleted in Supabase DB
+      await deleteMarketItemAction(targetId);
 
       setDeleteItemTarget(null);
     } catch (err) {
@@ -127,12 +121,13 @@ export default function MarketPage() {
   }, [profile?.school]);
 
   React.useEffect(() => {
-    // 1. Load locally created market items
+    // 1. Load locally created market items (excluding deleted ones)
     if (typeof window !== "undefined") {
       try {
         const localItems = JSON.parse(localStorage.getItem("campsnest_custom_market_items") || "[]");
-        if (localItems.length > 0) {
-          setProducts(localItems);
+        const activeLocal = localItems.filter((i: any) => !isListingDeleted(i.id));
+        if (activeLocal.length > 0) {
+          setProducts(activeLocal);
         }
       } catch (e) {
         console.warn("Could not load local market items:", e);
@@ -143,41 +138,54 @@ export default function MarketPage() {
     const loadDbItems = async () => {
       const res = await fetchMarketItemsAction();
       if (res.success && res.items.length > 0) {
-        const formattedDbItems: MarketItem[] = res.items.map((item: any) => ({
-          id: item.id,
-          title: item.title,
-          description: item.description,
-          category: item.category || "electronics",
-          conditionBadge: item.condition_badge || "MINT CONDITION",
-          conditionColor: item.condition_color || "bg-[#1E293B]/80 text-emerald-300 border-emerald-500/30",
-          price: Number(item.price) || 0,
-          originalPrice: item.original_price ? Number(item.original_price) : undefined,
-          isNegotiable: item.is_negotiable ?? true,
-          school: item.school || "Federal University Wukari",
-          location: item.location || "Campus Main Gate",
-          postedTime: "Just now",
-          image: item.image || (item.images && item.images[0]) || "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&auto=format&fit=crop&q=80",
-          images: item.images && item.images.length > 0 ? item.images : item.image ? [item.image] : [],
-          seller_id: item.seller_id,
-          seller: {
-            id: item.seller_id,
-            name: item.seller_name || "Verified Student",
-            level: item.seller_level || "300 Level",
-            avatar: item.seller_avatar && !item.seller_avatar.includes("example.com")
-              ? item.seller_avatar
-              : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-            verified: true,
-            whatsapp: item.seller_whatsapp || "2348134351762"
-          },
-        }));
+        const formattedDbItems: MarketItem[] = res.items
+          .filter((item: any) => !isListingDeleted(item.id))
+          .map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            category: item.category || "electronics",
+            conditionBadge: item.condition_badge || "MINT CONDITION",
+            conditionColor: item.condition_color || "bg-[#1E293B]/80 text-emerald-300 border-emerald-500/30",
+            price: Number(item.price) || 0,
+            originalPrice: item.original_price ? Number(item.original_price) : undefined,
+            isNegotiable: item.is_negotiable ?? true,
+            school: item.school || "Federal University Wukari",
+            location: item.location || "Campus Main Gate",
+            postedTime: "Just now",
+            image: item.image || (item.images && item.images[0]) || "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&auto=format&fit=crop&q=80",
+            images: item.images && item.images.length > 0 ? item.images : item.image ? [item.image] : [],
+            seller_id: item.seller_id,
+            seller: {
+              id: item.seller_id,
+              name: (item as any).seller?.name || item.seller_name || "Verified Student",
+              level: (item as any).seller?.level || item.seller_level || "300 Level",
+              avatar: (item as any).seller?.profile_image || (item.seller_avatar && !item.seller_avatar.includes("example.com")
+                ? item.seller_avatar
+                : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"),
+              verified: true,
+              whatsapp: normalizePhoneNumber((item as any).seller?.whatsapp_number || (item as any).seller?.phone_number || item.seller_whatsapp) || "2348134351762"
+            },
+          }));
 
         setProducts((prev) => {
-          const localOnly = prev.filter(p => !formattedDbItems.some(db => db.id === p.id));
+          const localOnly = prev.filter(p => !isListingDeleted(p.id) && !formattedDbItems.some(db => String(db.id) === String(p.id)));
           return [...localOnly, ...formattedDbItems];
         });
       }
     };
     loadDbItems();
+
+    // 3. Reactive listener for deletions across the app
+    const handleListingDeleted = (e: any) => {
+      const deletedId = e?.detail?.id;
+      if (deletedId) {
+        setProducts((prev) => prev.filter((p) => String(p.id) !== String(deletedId)));
+      }
+    };
+
+    window.addEventListener("campsnest:listing_deleted", handleListingDeleted);
+    return () => window.removeEventListener("campsnest:listing_deleted", handleListingDeleted);
   }, []);
 
   const toggleBookmark = (id: string) => {
@@ -240,7 +248,7 @@ export default function MarketPage() {
       const matchesCategory = activeCategory === "all" ||
         (item.category && item.category.toLowerCase() === activeCategory.toLowerCase());
 
-      return matchesCategory;
+      return matchesCategory && !isListingDeleted(item.id);
     });
   }, [products, searchQuery, activeCategory, selectedCampus]);
 
@@ -335,13 +343,7 @@ export default function MarketPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5 w-full">
             {filteredProducts.map((item) => {
               const isSaved = savedItems.includes(item.id);
-              const isOwner = Boolean(
-                profile?.id && (
-                  item.seller_id === profile.id ||
-                  item.seller?.id === profile.id ||
-                  (item.seller?.whatsapp && profile.whatsapp_number && item.seller.whatsapp === profile.whatsapp_number)
-                )
-              );
+              const isOwner = checkIsListingOwner(item, profile);
               const hasDiscount = item.originalPrice && item.originalPrice > item.price;
               const discountPercent = hasDiscount
                 ? Math.round(((item.originalPrice! - item.price) / item.originalPrice!) * 100)
@@ -472,7 +474,7 @@ export default function MarketPage() {
                       </button>
                     ) : (
                       <a
-                        href={`https://wa.me/${item.seller.whatsapp || "2348134351762"}?text=Hello%20${encodeURIComponent(item.seller.name)},%20I%20am%20interested%20in%20buying%20"${encodeURIComponent(item.title)}"%20for%20₦${item.price.toLocaleString()}%20on%20CampsNest.`}
+                        href={`https://wa.me/${normalizePhoneNumber(item.seller.whatsapp) || "2348134351762"}?text=Hello%20${encodeURIComponent(item.seller.name)},%20I%20am%20interested%20in%20buying%20"${encodeURIComponent(item.title)}"%20for%20₦${item.price.toLocaleString()}%20on%20CampsNest.`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="shrink-0"

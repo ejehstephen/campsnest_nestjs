@@ -55,6 +55,7 @@ import { CONNECT_QUESTIONS } from "@/lib/connect/constants";
 import { HousingItem } from "@/lib/housing/constants";
 import { deleteHousingListingAction } from "@/lib/housing/actions";
 import { deleteMarketItemAction } from "@/lib/market/actions";
+import { isListingDeleted, recordDeletedListingId } from "@/lib/listing-storage";
 import { isVideoUrl, parseUserName, formatNameFromEmail } from "@/lib/utils";
 import { ImageLightboxModal } from "@/components/ui/image-lightbox-modal";
 
@@ -69,29 +70,22 @@ export default function ProfilePage() {
   const confirmDeleteProfileListing = async () => {
     if (!deleteListingTarget) return;
     setIsDeletingListing(true);
+    const targetId = String(deleteListingTarget.id);
+
     try {
+      // 1. Permanently record deletion locally across storage
+      recordDeletedListingId(targetId);
+
+      // 2. Remove immediately from UI state
+      setUserListings((prev) => prev.filter((item) => String(item.id) !== targetId));
+
+      // 3. Mark and delete in Supabase DB
       if (deleteListingTarget.type === "housing") {
-        await deleteHousingListingAction(deleteListingTarget.id);
-        if (typeof window !== "undefined") {
-          try {
-            const lodges = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
-            localStorage.setItem("campsnest_custom_lodges", JSON.stringify(lodges.filter((l: any) => l.id !== deleteListingTarget.id)));
-            const hList = JSON.parse(localStorage.getItem("campsnest_local_housing_items") || "[]");
-            localStorage.setItem("campsnest_local_housing_items", JSON.stringify(hList.filter((h: any) => h.id !== deleteListingTarget.id)));
-          } catch (e) {}
-        }
+        await deleteHousingListingAction(targetId);
       } else {
-        await deleteMarketItemAction(deleteListingTarget.id);
-        if (typeof window !== "undefined") {
-          try {
-            const mItems = JSON.parse(localStorage.getItem("campsnest_custom_market_items") || "[]");
-            localStorage.setItem("campsnest_custom_market_items", JSON.stringify(mItems.filter((i: any) => i.id !== deleteListingTarget.id)));
-            const mLocal = JSON.parse(localStorage.getItem("campsnest_local_market_items") || "[]");
-            localStorage.setItem("campsnest_local_market_items", JSON.stringify(mLocal.filter((i: any) => i.id !== deleteListingTarget.id)));
-          } catch (e) {}
-        }
+        await deleteMarketItemAction(targetId);
       }
-      setUserListings((prev) => prev.filter((item) => item.id !== deleteListingTarget.id));
+
       setDeleteListingTarget(null);
     } catch (err) {
       console.error("Delete listing error:", err);
@@ -121,8 +115,14 @@ export default function ProfilePage() {
 
       if (typeof window !== "undefined") {
         try {
-          localMarketItems = JSON.parse(localStorage.getItem("campsnest_local_market_items") || "[]");
-          localHousingItems = JSON.parse(localStorage.getItem("campsnest_local_housing_items") || "[]");
+          const customMarket = JSON.parse(localStorage.getItem("campsnest_custom_market_items") || "[]");
+          const localMarket = JSON.parse(localStorage.getItem("campsnest_local_market_items") || "[]");
+          localMarketItems = [...customMarket, ...localMarket].filter((i: any) => !isListingDeleted(i.id));
+
+          const customHousing = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
+          const localHousing = JSON.parse(localStorage.getItem("campsnest_local_housing_items") || "[]");
+          localHousingItems = [...customHousing, ...localHousing].filter((h: any) => !isListingDeleted(h.id));
+
           localSavedIds = JSON.parse(localStorage.getItem("campsnest_saved_housing") || "[]");
           localAnswers = JSON.parse(localStorage.getItem("campsnest_questionnaire_answers") || "{}");
         } catch (e) {
@@ -138,38 +138,65 @@ export default function ProfilePage() {
         fetchUserAnswersAction(profile?.id)
       ]);
 
-      // Combine local session items with DB listings
-      const formattedLocalMarket: ProfileListingItem[] = localMarketItems.map((m: any) => ({
-        id: m.id || `m-${Date.now()}`,
-        type: "market",
-        title: m.title,
-        subtitle: `${m.category || "Item"} • ${m.condition_badge || "Mint Condition"}`,
-        price: m.price,
-        status: "Active",
-        inquiries: 6,
-        image: m.image || (m.images && m.images[0]) || "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&auto=format&fit=crop&q=80"
-      }));
+      // Combine local session items with DB listings (strictly filter out deleted items)
+      const formattedLocalMarket: ProfileListingItem[] = localMarketItems
+        .filter((m: any) => !isListingDeleted(m.id))
+        .map((m: any) => ({
+          id: m.id || `m-${Date.now()}`,
+          type: "market",
+          title: m.title,
+          subtitle: `${m.category || "Item"} • ${m.condition_badge || "Mint Condition"}`,
+          price: m.price,
+          status: "Active",
+          inquiries: 6,
+          image: m.image || (m.images && m.images[0]) || "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&auto=format&fit=crop&q=80"
+        }));
 
-      const formattedLocalHousing: ProfileListingItem[] = localHousingItems.map((h: any) => ({
-        id: h.id || `h-${Date.now()}`,
-        type: "housing",
-        title: h.title,
-        subtitle: `${h.location} • Lodge`,
-        price: h.price,
-        status: "Active",
-        inquiries: 9,
-        image: h.image || (h.images && h.images[0]) || "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&auto=format&fit=crop&q=80"
-      }));
+      const formattedLocalHousing: ProfileListingItem[] = localHousingItems
+        .filter((h: any) => !isListingDeleted(h.id))
+        .map((h: any) => ({
+          id: h.id || `h-${Date.now()}`,
+          type: "housing",
+          title: h.title,
+          subtitle: `${h.location} • Lodge`,
+          price: h.price,
+          status: "Active",
+          inquiries: 9,
+          image: h.image || (h.images && h.images[0]) || "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&auto=format&fit=crop&q=80"
+        }));
 
-      const mergedListings = [...formattedLocalMarket, ...formattedLocalHousing, ...dbListings];
+      const activeDbListings = (dbListings || []).filter((item: any) => !isListingDeleted(item.id));
+      const seenIds = new Set<string>();
+      const mergedListings: ProfileListingItem[] = [];
+
+      [...formattedLocalMarket, ...formattedLocalHousing, ...activeDbListings].forEach((item) => {
+        const idStr = String(item.id);
+        if (!seenIds.has(idStr) && !isListingDeleted(idStr)) {
+          seenIds.add(idStr);
+          mergedListings.push(item);
+        }
+      });
+
       setUserListings(mergedListings);
-      setSavedHouses(dbSaved || []);
+      setSavedHouses((dbSaved || []).filter((h: any) => !isListingDeleted(h.id)));
       setInspections(dbInspections || []);
       setVibeAnswers({ ...localAnswers, ...dbAnswers });
       setLoadingTab(false);
     }
 
     loadProfileData();
+
+    // 2. Reactive listener for deletions across the app
+    const handleListingDeleted = (e: any) => {
+      const deletedId = e?.detail?.id;
+      if (deletedId) {
+        setUserListings((prev) => prev.filter((item) => String(item.id) !== String(deletedId)));
+        setSavedHouses((prev) => prev.filter((h) => String(h.id) !== String(deletedId)));
+      }
+    };
+
+    window.addEventListener("campsnest:listing_deleted", handleListingDeleted);
+    return () => window.removeEventListener("campsnest:listing_deleted", handleListingDeleted);
   }, [profile?.id]);
 
   const resolvedName = React.useMemo(() => {

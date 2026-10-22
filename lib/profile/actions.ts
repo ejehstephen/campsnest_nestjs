@@ -49,6 +49,7 @@ export async function fetchUserAllListingsAction(userId?: string): Promise<Profi
         .from("marketplace_items")
         .select("*")
         .eq("seller_id", activeUserId)
+        .neq("status", "deleted")
         .order("created_at", { ascending: false });
 
       if (marketItems && marketItems.length > 0) {
@@ -73,6 +74,7 @@ export async function fetchUserAllListingsAction(userId?: string): Promise<Profi
         .from("room_listings")
         .select("*, room_listing_images(images)")
         .eq("owner_id", activeUserId)
+        .neq("is_active", false)
         .order("created_at", { ascending: false });
 
       if (houseItems && houseItems.length > 0) {

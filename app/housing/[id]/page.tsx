@@ -43,6 +43,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { ReportModal } from "@/components/common/report-modal";
 import { ShareModal } from "@/components/common/share-modal";
 import { fetchHousingListingByIdAction, bookInspectionAction, deleteHousingListingAction } from "@/lib/housing/actions";
+import { isListingDeleted, recordDeletedListingId, checkIsListingOwner, normalizePhoneNumber } from "@/lib/listing-storage";
 import { HOUSING_LISTINGS, HousingItem } from "@/lib/housing/constants";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { parseUserName } from "@/lib/utils";
@@ -175,7 +176,8 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
   const hostRole = ownerRecord?.level || house.host?.role || house.host_role || (ownerRecord?.role === "admin" ? "Verified Host Admin" : "Student Host");
   const hostSchool = ownerRecord?.school || house.school || "Federal University Wukari";
   const hostPhone = ownerRecord?.phone_number || house.owner_phone || house.host?.phone || house.host_phone || "";
-  const hostWhatsapp = ownerRecord?.whatsapp_number || house.whatsapp_link || house.host?.whatsapp || house.host_whatsapp || ownerRecord?.phone_number || house.owner_phone || "";
+  const rawHostWhatsapp = ownerRecord?.whatsapp_number || house.whatsapp_link || house.host?.whatsapp || house.host_whatsapp || ownerRecord?.phone_number || house.owner_phone || "";
+  const hostWhatsapp = normalizePhoneNumber(rawHostWhatsapp);
   const hostInitials = hostName.split(" ").filter(Boolean).map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "VH";
 
   // Dynamic Verified Facilities & Utilities Resolution
@@ -269,27 +271,20 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
     setActivePhoto((prev) => (prev < galleryImages.length - 1 ? prev + 1 : 0));
   };
 
-  const isOwner = Boolean(
-    profile?.id && (
-      house.owner_id === profile.id ||
-      house.owner?.id === profile.id ||
-      (house.host?.phone && profile.phone_number && house.host.phone === profile.phone_number)
-    )
-  );
+  // Redirect if this listing has already been permanently deleted
+  React.useEffect(() => {
+    if (isListingDeleted(params.id)) {
+      router.replace("/housing");
+    }
+  }, [params.id, router]);
+
+  const isOwner = checkIsListingOwner(house, profile);
 
   const handleDeleteListing = async () => {
     setIsDeleting(true);
     try {
+      recordDeletedListingId(params.id);
       await deleteHousingListingAction(params.id);
-      if (typeof window !== "undefined") {
-        try {
-          const localLodges = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
-          localStorage.setItem("campsnest_custom_lodges", JSON.stringify(localLodges.filter((h: any) => h.id !== params.id)));
-
-          const localHousing = JSON.parse(localStorage.getItem("campsnest_local_housing_items") || "[]");
-          localStorage.setItem("campsnest_local_housing_items", JSON.stringify(localHousing.filter((h: any) => h.id !== params.id)));
-        } catch (e) {}
-      }
       router.push("/housing");
     } catch (err) {
       console.error("Delete house failed:", err);
@@ -588,7 +583,7 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
 
                 {hostWhatsapp ? (
                   <a
-                    href={`https://wa.me/${hostWhatsapp.replace(/\+/g, "").replace(/\s+/g, "").replace(/-/g, "")}?text=${encodeURIComponent(`Hi ${hostName}, I am inquiring about "${title}" listed for ₦${price.toLocaleString()} on CampsNest Housing.`)}`}
+                    href={`https://wa.me/${hostWhatsapp}?text=${encodeURIComponent(`Hi ${hostName}, I am inquiring about "${title}" listed for ₦${price.toLocaleString()} on CampsNest Housing.`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block w-full"

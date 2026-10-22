@@ -189,6 +189,7 @@ export async function fetchHousingListingsAction(school?: string) {
           amenities
         )
       `)
+      .neq("is_active", false)
       .order("created_at", { ascending: false });
 
     if (school && school !== "all" && school.trim() !== "") {
@@ -202,6 +203,7 @@ export async function fetchHousingListingsAction(school?: string) {
       let simpleQuery = supabase
         .from("room_listings")
         .select("*, room_listing_images(images), room_listing_amenities(amenities)")
+        .neq("is_active", false)
         .order("created_at", { ascending: false });
 
       if (school && school !== "all" && school.trim() !== "") {
@@ -259,7 +261,7 @@ export async function fetchHousingListingByIdAction(id: string) {
         .eq("id", id)
         .maybeSingle();
 
-      if (!simpleItem) {
+      if (!simpleItem || simpleItem.is_active === false) {
         return { success: false, item: null };
       }
 
@@ -275,6 +277,10 @@ export async function fetchHousingListingByIdAction(id: string) {
       }
 
       return { success: true, item: simpleItem };
+    }
+
+    if (data.is_active === false) {
+      return { success: false, item: null };
     }
 
     // Ensure owner record is attached if foreign key joined null
@@ -342,59 +348,39 @@ export async function deleteHousingListingAction(listingId: string) {
 
   try {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
 
-    // Check if listing exists in Supabase room_listings
-    const { data: listing } = await supabase
-      .from("room_listings")
-      .select("id, owner_id")
-      .eq("id", listingId)
-      .maybeSingle();
+    // 1. Soft-delete immediately in Supabase room_listings (is_active = false)
+    try {
+      await supabase
+        .from("room_listings")
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq("id", listingId);
+    } catch (updateErr) {
+      console.warn("room_listings soft-delete notice:", updateErr);
+    }
 
-    if (listing) {
-      // If user is authenticated, ensure they are owner or admin
-      if (user && listing.owner_id && listing.owner_id !== user.id) {
-        // Check if user is admin in users table
-        const { data: currentUser } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", user.id)
-          .maybeSingle();
+    // 2. Delete child records
+    try {
+      await Promise.allSettled([
+        supabase.from("room_listing_images").delete().eq("room_listing_id", listingId),
+        supabase.from("room_listing_amenities").delete().eq("room_listing_id", listingId),
+        supabase.from("saved_houses").delete().eq("room_listing_id", listingId),
+        supabase.from("inspections").delete().eq("listing_id", listingId),
+      ]);
+    } catch (childErr) {}
 
-        if (currentUser?.role !== "admin") {
-          return { success: false, error: "Unauthorized: Only the property owner can delete this listing." };
-        }
-      }
+    // 3. Try calling legacy RPC if available
+    try {
+      await supabase.rpc("admin_delete_listing", { target_listing_id: listingId });
+    } catch (rpcErr) {}
 
-      // 1. Delete associated images
-      await supabase.from("room_listing_images").delete().eq("room_listing_id", listingId);
-
-      // 2. Delete associated amenities
-      await supabase.from("room_listing_amenities").delete().eq("room_listing_id", listingId);
-
-      // 3. Delete saved house references
-      await supabase.from("saved_houses").delete().eq("room_listing_id", listingId);
-
-      // 4. Delete inspection bookings
-      await supabase.from("inspections").delete().eq("listing_id", listingId);
-
-      // 5. Try calling legacy RPC if available
-      try {
-        await supabase.rpc("admin_delete_listing", { target_listing_id: listingId });
-      } catch (rpcErr) {
-        // Fallback to direct row delete
-      }
-
-      // 6. Delete listing record
-      const { error: deleteErr } = await supabase
+    // 4. Try hard row deletion on room_listings
+    try {
+      await supabase
         .from("room_listings")
         .delete()
         .eq("id", listingId);
-
-      if (deleteErr) {
-        console.warn("DB room_listings delete warning:", deleteErr.message);
-      }
-    }
+    } catch (delErr) {}
 
     revalidatePath("/housing");
     revalidatePath("/home");

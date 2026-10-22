@@ -47,6 +47,7 @@ import { PostHouseModal, PublishedHouse } from "@/components/housing/post-house-
 import { isVideoUrl, parseUserName } from "@/lib/utils";
 import { ShareModal } from "@/components/common/share-modal";
 import { fetchHousingListingsAction, deleteHousingListingAction } from "@/lib/housing/actions";
+import { isListingDeleted, recordDeletedListingId, checkIsListingOwner, normalizePhoneNumber } from "@/lib/listing-storage";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { CAMPUS_LIST } from "@/lib/constants";
 import { 
@@ -90,24 +91,17 @@ export default function HousingDiscoveryPage() {
   const confirmDeleteHouse = async () => {
     if (!deleteHouseTarget) return;
     setIsDeletingHouse(true);
+    const targetId = String(deleteHouseTarget.id);
+
     try {
-      await deleteHousingListingAction(deleteHouseTarget.id);
-      
-      // Remove from active state
-      setHousingListings((prev) => prev.filter((h) => h.id !== deleteHouseTarget.id));
+      // 1. Permanently blacklist and purge locally across storage
+      recordDeletedListingId(targetId);
 
-      // Remove from client local storages
-      if (typeof window !== "undefined") {
-        try {
-          const localLodges = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
-          const updatedLodges = localLodges.filter((h: any) => h.id !== deleteHouseTarget.id);
-          localStorage.setItem("campsnest_custom_lodges", JSON.stringify(updatedLodges));
+      // 2. Remove immediately from React state
+      setHousingListings((prev) => prev.filter((h) => String(h.id) !== targetId));
 
-          const localHousing = JSON.parse(localStorage.getItem("campsnest_local_housing_items") || "[]");
-          const updatedHousing = localHousing.filter((h: any) => h.id !== deleteHouseTarget.id);
-          localStorage.setItem("campsnest_local_housing_items", JSON.stringify(updatedHousing));
-        } catch (e) {}
-      }
+      // 3. Mark as inactive and delete in Supabase DB
+      await deleteHousingListingAction(targetId);
 
       setDeleteHouseTarget(null);
     } catch (err) {
@@ -159,13 +153,14 @@ export default function HousingDiscoveryPage() {
   }, [profile?.school]);
 
   React.useEffect(() => {
-    // 1. Load locally saved lodges immediately
+    // 1. Load locally saved lodges immediately (excluding deleted ones)
     let localLodges: HousingItem[] = [];
     if (typeof window !== "undefined") {
       try {
         localLodges = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
-        if (localLodges.length > 0) {
-          setHousingListings(localLodges);
+        const activeLocal = localLodges.filter((h: any) => !isListingDeleted(h.id));
+        if (activeLocal.length > 0) {
+          setHousingListings(activeLocal);
         }
       } catch (e) {
         console.warn("Could not load local lodges:", e);
@@ -177,81 +172,83 @@ export default function HousingDiscoveryPage() {
       try {
         const res = await fetchHousingListingsAction();
         if (res.success && res.items.length > 0) {
-          const formattedDbHouses: HousingItem[] = res.items.map((item: any) => {
-            const dbImages = item.room_listing_images?.map((r: any) => r.images).filter(Boolean) || [];
-            const primaryImg = item.image || (dbImages.length > 0 ? dbImages[0] : "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80");
-            
-            const ownerRecord = item.owner || null;
-            const hostName = parseUserName(ownerRecord, null, item.host_name || "Verified Campus Host");
-            const hostAvatar = (ownerRecord?.profile_image && !ownerRecord.profile_image.includes("example.com") ? ownerRecord.profile_image : "") || "";
-            const hostRole = ownerRecord?.level || (ownerRecord?.role === "admin" ? "Verified Host Admin" : "Lodge Host");
-            const hostInitials = hostName.split(" ").filter(Boolean).map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "VH";
+          const formattedDbHouses: HousingItem[] = res.items
+            .filter((item: any) => !isListingDeleted(item.id))
+            .map((item: any) => {
+              const dbImages = item.room_listing_images?.map((r: any) => r.images).filter(Boolean) || [];
+              const primaryImg = item.image || (dbImages.length > 0 ? dbImages[0] : "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80");
+              
+              const ownerRecord = item.owner || null;
+              const hostName = parseUserName(ownerRecord, null, item.host_name || "Verified Campus Host");
+              const hostAvatar = (ownerRecord?.profile_image && !ownerRecord.profile_image.includes("example.com") ? ownerRecord.profile_image : "") || "";
+              const hostRole = ownerRecord?.level || (ownerRecord?.role === "admin" ? "Verified Host Admin" : "Lodge Host");
+              const hostInitials = hostName.split(" ").filter(Boolean).map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "VH";
 
-            const dbAmenityList: string[] = (item.room_listing_amenities || []).map((a: any) => a.amenities).filter(Boolean);
-            const descText = (item.description || "").toLowerCase();
+              const dbAmenityList: string[] = (item.room_listing_amenities || []).map((a: any) => a.amenities).filter(Boolean);
+              const descText = (item.description || "").toLowerCase();
 
-            const dynamicFeatures: { label: string; icon: any }[] = [];
-            if (dbAmenityList.length > 0) {
-              dbAmenityList.forEach((am) => {
-                const amLower = am.toLowerCase();
-                const icon = amLower.includes("water") || amLower.includes("borehole") ? Droplets :
-                             amLower.includes("solar") || amLower.includes("sun") ? Sun :
-                             amLower.includes("meter") || amLower.includes("light") || amLower.includes("prepaid") ? Zap :
-                             amLower.includes("guard") || amLower.includes("security") ? Shield :
-                             amLower.includes("wifi") ? Wifi : Building2;
-                dynamicFeatures.push({ label: am, icon });
-              });
-            } else {
-              if (descText.includes("water") || descText.includes("borehole")) dynamicFeatures.push({ label: "Borehole Water", icon: Droplets });
-              if (descText.includes("solar") || descText.includes("inverter")) dynamicFeatures.push({ label: "Solar Inverter", icon: Sun });
-              if (descText.includes("prepaid") || descText.includes("meter") || descText.includes("light")) dynamicFeatures.push({ label: "Prepaid Meter", icon: Zap });
-              if (descText.includes("guard") || descText.includes("security") || descText.includes("gated")) dynamicFeatures.push({ label: "Gated Guard", icon: Shield });
-              if (descText.includes("fence") || descText.includes("fenced")) dynamicFeatures.push({ label: "Fenced Compound", icon: Building2 });
-            }
-
-            if (dynamicFeatures.length === 0) {
-              dynamicFeatures.push(
-                { label: "Borehole Water", icon: Droplets },
-                { label: "Prepaid Meter", icon: Zap },
-                { label: "Gated Guard", icon: Shield }
-              );
-            }
-
-            return {
-              id: item.id,
-              title: item.title,
-              category: item.house_type || "self-contain",
-              categoryBadge: item.house_type ? item.house_type.replace(/_/g, " ").toUpperCase() : "Self Contain",
-              statusBadge: item.status === "available" ? "Verified & Ready" : "Verified Listing",
-              statusBadgeColor: "bg-[#3B82F6]/30 text-[#ADC6FF] border-[#3B82F6]/40",
-              address: item.location || "Campus Enclave",
-              price: Number(item.price) || 180000,
-              priceUnit: "/ year",
-              distance: item.distance_from_campus || "5 mins to Gate",
-              photoCount: dbImages.length > 0 ? dbImages.length : 4,
-              image: primaryImg,
-              images: dbImages.length > 0 ? dbImages : [primaryImg],
-              description: item.description,
-              school: item.school || ownerRecord?.school || (item.location?.toLowerCase().includes("wukari") ? "Federal University Wukari" : (selectedCampus?.name || "Campus")),
-              owner_id: item.owner_id || ownerRecord?.id,
-              owner: ownerRecord,
-              room_listing_amenities: item.room_listing_amenities,
-              amenities: dbAmenityList,
-              features: dynamicFeatures,
-              host: {
-                initials: hostInitials,
-                name: hostName,
-                role: hostRole,
-                badge: "Verified Lodge",
-                badgeColor: "bg-brand-magenta/20 text-brand-magenta-light border-brand-magenta/30",
-                whatsapp: ownerRecord?.whatsapp_number || item.whatsapp_link || item.host_whatsapp || ownerRecord?.phone_number || item.owner_phone || "2348134351762",
-                phone: ownerRecord?.phone_number || item.owner_phone || item.host_phone || "08134351762"
+              const dynamicFeatures: { label: string; icon: any }[] = [];
+              if (dbAmenityList.length > 0) {
+                dbAmenityList.forEach((am) => {
+                  const amLower = am.toLowerCase();
+                  const icon = amLower.includes("water") || amLower.includes("borehole") ? Droplets :
+                               amLower.includes("solar") || amLower.includes("sun") ? Sun :
+                               amLower.includes("meter") || amLower.includes("light") || amLower.includes("prepaid") ? Zap :
+                               amLower.includes("guard") || amLower.includes("security") ? Shield :
+                               amLower.includes("wifi") ? Wifi : Building2;
+                  dynamicFeatures.push({ label: am, icon });
+                });
+              } else {
+                if (descText.includes("water") || descText.includes("borehole")) dynamicFeatures.push({ label: "Borehole Water", icon: Droplets });
+                if (descText.includes("solar") || descText.includes("inverter")) dynamicFeatures.push({ label: "Solar Inverter", icon: Sun });
+                if (descText.includes("prepaid") || descText.includes("meter") || descText.includes("light")) dynamicFeatures.push({ label: "Prepaid Meter", icon: Zap });
+                if (descText.includes("guard") || descText.includes("security") || descText.includes("gated")) dynamicFeatures.push({ label: "Gated Guard", icon: Shield });
+                if (descText.includes("fence") || descText.includes("fenced")) dynamicFeatures.push({ label: "Fenced Compound", icon: Building2 });
               }
-            };
-          });
+
+              if (dynamicFeatures.length === 0) {
+                dynamicFeatures.push(
+                  { label: "Borehole Water", icon: Droplets },
+                  { label: "Prepaid Meter", icon: Zap },
+                  { label: "Gated Guard", icon: Shield }
+                );
+              }
+
+              return {
+                id: item.id,
+                title: item.title,
+                category: item.house_type || "self-contain",
+                categoryBadge: item.house_type ? item.house_type.replace(/_/g, " ").toUpperCase() : "Self Contain",
+                statusBadge: item.status === "available" ? "Verified & Ready" : "Verified Listing",
+                statusBadgeColor: "bg-[#3B82F6]/30 text-[#ADC6FF] border-[#3B82F6]/40",
+                address: item.location || "Campus Enclave",
+                price: Number(item.price) || 180000,
+                priceUnit: "/ year",
+                distance: item.distance_from_campus || "5 mins to Gate",
+                photoCount: dbImages.length > 0 ? dbImages.length : 4,
+                image: primaryImg,
+                images: dbImages.length > 0 ? dbImages : [primaryImg],
+                description: item.description,
+                school: item.school || ownerRecord?.school || (item.location?.toLowerCase().includes("wukari") ? "Federal University Wukari" : (selectedCampus?.name || "Campus")),
+                owner_id: item.owner_id || ownerRecord?.id,
+                owner: ownerRecord,
+                room_listing_amenities: item.room_listing_amenities,
+                amenities: dbAmenityList,
+                features: dynamicFeatures,
+                host: {
+                  initials: hostInitials,
+                  name: hostName,
+                  role: hostRole,
+                  badge: "Verified Lodge",
+                  badgeColor: "bg-brand-magenta/20 text-brand-magenta-light border-brand-magenta/30",
+                  whatsapp: normalizePhoneNumber(ownerRecord?.whatsapp_number || item.whatsapp_link || item.host_whatsapp || ownerRecord?.phone_number || item.owner_phone) || "2348134351762",
+                  phone: ownerRecord?.phone_number || item.owner_phone || item.host_phone || "08134351762"
+                }
+              };
+            });
 
           setHousingListings((prev) => {
-            const localOnly = prev.filter(p => !formattedDbHouses.some(db => db.id === p.id));
+            const localOnly = prev.filter(p => !isListingDeleted(p.id) && !formattedDbHouses.some(db => String(db.id) === String(p.id)));
             return [...localOnly, ...formattedDbHouses];
           });
         }
@@ -260,6 +257,17 @@ export default function HousingDiscoveryPage() {
       }
     };
     loadDbHouses();
+
+    // 3. Reactive listener for deletions across the app
+    const handleListingDeleted = (e: any) => {
+      const deletedId = e?.detail?.id;
+      if (deletedId) {
+        setHousingListings((prev) => prev.filter((h) => String(h.id) !== String(deletedId)));
+      }
+    };
+
+    window.addEventListener("campsnest:listing_deleted", handleListingDeleted);
+    return () => window.removeEventListener("campsnest:listing_deleted", handleListingDeleted);
   }, [selectedCampus?.name]);
 
   const toggleBookmark = (id: string) => {
@@ -342,7 +350,7 @@ export default function HousingDiscoveryPage() {
         return listing.features.some(f => f.label.toLowerCase().includes("water") || f.label.toLowerCase().includes("borehole"));
       }
 
-      return true;
+      return !isListingDeleted(listing.id);
     });
   }, [housingListings, searchQuery, maxBudget, activeFilter, selectedCampus]);
 
@@ -482,13 +490,7 @@ export default function HousingDiscoveryPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredListings.map((house) => {
               const isSaved = savedNests.includes(house.id);
-              const isOwner = Boolean(
-                profile?.id && (
-                  house.owner_id === profile.id ||
-                  house.owner?.id === profile.id ||
-                  (house.host?.phone && profile.phone_number && house.host.phone === profile.phone_number)
-                )
-              );
+              const isOwner = checkIsListingOwner(house, profile);
               const hasVideo = isVideoUrl(house.image) || (house.images && house.images.some(img => isVideoUrl(img)));
               const videoSrc = isVideoUrl(house.image) ? house.image : (house.images?.find(img => isVideoUrl(img)) || "");
 
@@ -625,7 +627,7 @@ export default function HousingDiscoveryPage() {
 
                     {/* WhatsApp Chat Button */}
                     <a
-                      href={`https://wa.me/${house.host.whatsapp || "2348134351762"}?text=Hello%20${encodeURIComponent(house.host.name)},%20I%20saw%20your%20listing%20"${encodeURIComponent(house.title)}"%20on%20CampsNest.`}
+                      href={`https://wa.me/${normalizePhoneNumber(house.host.whatsapp) || "2348134351762"}?text=Hello%20${encodeURIComponent(house.host.name)},%20I%20saw%20your%20listing%20"${encodeURIComponent(house.title)}"%20on%20CampsNest.`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-3 rounded-full bg-white/[0.05] hover:bg-emerald-600/20 border border-white/10 hover:border-emerald-500/40 text-text-dim hover:text-emerald-300 transition-all shrink-0"

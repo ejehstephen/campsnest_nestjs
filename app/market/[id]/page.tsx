@@ -44,6 +44,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ReportModal } from "@/components/common/report-modal";
 import { ShareModal } from "@/components/common/share-modal";
 import { fetchMarketItemByIdAction, fetchMarketItemsAction, deleteMarketItemAction } from "@/lib/market/actions";
+import { isListingDeleted, recordDeletedListingId, checkIsListingOwner, normalizePhoneNumber } from "@/lib/listing-storage";
 import { Avatar } from "@/components/ui/avatar";
 import { MARKET_PRODUCTS, MarketItem } from "@/lib/market/constants";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -156,12 +157,14 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
   const isNegotiable = item.is_negotiable !== undefined ? item.is_negotiable : item.isNegotiable !== undefined ? item.isNegotiable : true;
   const description = item.description || "Clean, verified item in great condition. Available for quick campus inspection.";
   const location = item.location || "Campus Hostel / Faculty";
-  const sellerName = item.seller_name || item.seller?.name || "Verified Student";
-  const sellerLevel = item.seller_level || item.seller?.level || "Campus Resident";
-  const sellerAvatar = (item.seller_avatar || item.seller?.avatar) && !item.seller_avatar?.includes("example.com")
-    ? (item.seller_avatar || item.seller?.avatar)
+  const sellerUser = (item as any)?.seller;
+  const sellerName = sellerUser?.name || item.seller_name || item.seller?.name || "Verified Student";
+  const sellerLevel = sellerUser?.level || item.seller_level || item.seller?.level || "Campus Resident";
+  const sellerAvatar = (sellerUser?.profile_image || item.seller_avatar || item.seller?.avatar) && !item.seller_avatar?.includes("example.com")
+    ? (sellerUser?.profile_image || item.seller_avatar || item.seller?.avatar)
     : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80";
-  const sellerWhatsapp = item.seller_whatsapp || item.seller?.whatsapp || "";
+  const rawSellerPhone = sellerUser?.whatsapp_number || sellerUser?.phone_number || item.seller_whatsapp || item.seller?.whatsapp || "";
+  const sellerWhatsapp = normalizePhoneNumber(rawSellerPhone);
 
   // Dynamic Item Attributes
   const itemSpecs = [
@@ -213,27 +216,20 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
     setActivePhoto((prev) => (prev < galleryImages.length - 1 ? prev + 1 : 0));
   };
 
-  const isOwner = Boolean(
-    profile?.id && (
-      item.seller_id === profile.id ||
-      item.seller?.id === profile.id ||
-      (sellerWhatsapp && profile.whatsapp_number && sellerWhatsapp === profile.whatsapp_number)
-    )
-  );
+  // Redirect if this item has already been permanently deleted
+  React.useEffect(() => {
+    if (isListingDeleted(params.id)) {
+      router.replace("/market");
+    }
+  }, [params.id, router]);
+
+  const isOwner = checkIsListingOwner(item, profile);
 
   const handleDeleteItem = async () => {
     setIsDeleting(true);
     try {
+      recordDeletedListingId(params.id);
       await deleteMarketItemAction(params.id);
-      if (typeof window !== "undefined") {
-        try {
-          const localItems = JSON.parse(localStorage.getItem("campsnest_custom_market_items") || "[]");
-          localStorage.setItem("campsnest_custom_market_items", JSON.stringify(localItems.filter((i: any) => i.id !== params.id)));
-
-          const localMarket = JSON.parse(localStorage.getItem("campsnest_local_market_items") || "[]");
-          localStorage.setItem("campsnest_local_market_items", JSON.stringify(localMarket.filter((i: any) => i.id !== params.id)));
-        } catch (e) {}
-      }
       router.push("/market");
     } catch (err) {
       console.error("Delete market item error:", err);
@@ -504,7 +500,7 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
 
                 {sellerWhatsapp && (
                   <a 
-                    href={`https://wa.me/${sellerWhatsapp.replace(/\+/g, "").replace(/\s+/g, "")}?text=${encodeURIComponent(`Hi ${sellerName}, I am interested in your listing: "${title}" on CampsNest Marketplace.`)}`}
+                    href={`https://wa.me/${sellerWhatsapp}?text=${encodeURIComponent(`Hi ${sellerName}, I am interested in your listing: "${title}" on CampsNest Marketplace.`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block w-full"
@@ -712,7 +708,7 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
           <div className="flex items-center gap-2">
             {sellerWhatsapp && (
               <a 
-                href={`https://wa.me/${sellerWhatsapp.replace(/\+/g, "").replace(/\s+/g, "")}?text=${encodeURIComponent(`Hi ${sellerName}, I am interested in your listing: "${title}" on CampsNest.`)}`}
+                href={`https://wa.me/${sellerWhatsapp}?text=${encodeURIComponent(`Hi ${sellerName}, I am interested in your listing: "${title}" on CampsNest.`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >

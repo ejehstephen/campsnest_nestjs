@@ -34,6 +34,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { formatCurrency, isVideoUrl } from "@/lib/utils";
 import { fetchHousingListingsAction } from "@/lib/housing/actions";
 import { fetchMarketItemsAction } from "@/lib/market/actions";
+import { isListingDeleted } from "@/lib/listing-storage";
 import { HOUSING_LISTINGS, HousingItem } from "@/lib/housing/constants";
 import { MARKET_PRODUCTS, MarketItem } from "@/lib/market/constants";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -77,17 +78,19 @@ export default function HomeFeedPage() {
   }, [profile?.school]);
 
   React.useEffect(() => {
-    // 1. Load custom local data first
+    // 1. Load custom local data first (excluding deleted items)
     if (typeof window !== "undefined") {
       try {
         const localLodges = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
-        if (localLodges.length > 0) {
-          setHousingListings(localLodges);
+        const activeLodges = localLodges.filter((h: any) => !isListingDeleted(h.id));
+        if (activeLodges.length > 0) {
+          setHousingListings(activeLodges);
         }
 
         const localProducts = JSON.parse(localStorage.getItem("campsnest_custom_market_items") || "[]");
-        if (localProducts.length > 0) {
-          setMarketItems(localProducts);
+        const activeProducts = localProducts.filter((p: any) => !isListingDeleted(p.id));
+        if (activeProducts.length > 0) {
+          setMarketItems(activeProducts);
         }
       } catch (e) {
         console.warn("Could not parse local data on home page:", e);
@@ -103,83 +106,87 @@ export default function HomeFeedPage() {
         ]);
 
         if (housingRes?.success && housingRes.items?.length > 0) {
-          const formattedHouses: HousingItem[] = housingRes.items.map((item: any) => {
-            const dbImages = item.room_listing_images?.map((r: any) => r.images).filter(Boolean) || [];
-            const primaryImg = item.image || (dbImages.length > 0 ? dbImages[0] : "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80");
-            const ownerRecord = item.owner || null;
-            const hostName = ownerRecord?.name || item.host_name || "Verified Campus Host";
-            const hostRole = ownerRecord?.level || (ownerRecord?.role === "admin" ? "Verified Host Admin" : "Lodge Host");
-            const hostInitials = hostName.split(" ").filter(Boolean).map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "VH";
+          const formattedHouses: HousingItem[] = housingRes.items
+            .filter((item: any) => !isListingDeleted(item.id))
+            .map((item: any) => {
+              const dbImages = item.room_listing_images?.map((r: any) => r.images).filter(Boolean) || [];
+              const primaryImg = item.image || (dbImages.length > 0 ? dbImages[0] : "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80");
+              const ownerRecord = item.owner || null;
+              const hostName = ownerRecord?.name || item.host_name || "Verified Campus Host";
+              const hostRole = ownerRecord?.level || (ownerRecord?.role === "admin" ? "Verified Host Admin" : "Lodge Host");
+              const hostInitials = hostName.split(" ").filter(Boolean).map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "VH";
 
-            return {
-              id: item.id,
-              title: item.title,
-              category: item.house_type || "self-contain",
-              categoryBadge: item.house_type ? item.house_type.replace(/_/g, " ").toUpperCase() : "Self Contain",
-              statusBadge: item.status === "available" ? "Verified & Ready" : "Verified Lodge",
-              statusBadgeColor: "bg-[#3B82F6]/30 text-[#ADC6FF] border-[#3B82F6]/40",
-              address: item.location || "Campus Enclave",
-              price: Number(item.price) || 180000,
-              priceUnit: "/ year",
-              distance: item.distance_from_campus || "5 mins to Gate",
-              photoCount: dbImages.length > 0 ? dbImages.length : 4,
-              image: primaryImg,
-              images: dbImages.length > 0 ? dbImages : [primaryImg],
-              description: item.description,
-              school: item.school || ownerRecord?.school || (item.location?.toLowerCase().includes("wukari") ? "Federal University Wukari" : "Campus"),
-              features: [
-                { label: "Borehole Water", icon: Building2 },
-                { label: "Prepaid Meter", icon: Zap },
-                { label: "Gated Guard", icon: ShieldCheck }
-              ],
-              host: {
-                initials: hostInitials,
-                name: hostName,
-                role: hostRole,
-                badge: "Verified Lodge",
-                badgeColor: "bg-brand-magenta/20 text-brand-magenta-light border-brand-magenta/30",
-                whatsapp: ownerRecord?.whatsapp_number || item.whatsapp_link || item.host_whatsapp || "",
-                phone: ownerRecord?.phone_number || item.owner_phone || item.host_phone || ""
-              }
-            };
-          });
+              return {
+                id: item.id,
+                title: item.title,
+                category: item.house_type || "self-contain",
+                categoryBadge: item.house_type ? item.house_type.replace(/_/g, " ").toUpperCase() : "Self Contain",
+                statusBadge: item.status === "available" ? "Verified & Ready" : "Verified Lodge",
+                statusBadgeColor: "bg-[#3B82F6]/30 text-[#ADC6FF] border-[#3B82F6]/40",
+                address: item.location || "Campus Enclave",
+                price: Number(item.price) || 180000,
+                priceUnit: "/ year",
+                distance: item.distance_from_campus || "5 mins to Gate",
+                photoCount: dbImages.length > 0 ? dbImages.length : 4,
+                image: primaryImg,
+                images: dbImages.length > 0 ? dbImages : [primaryImg],
+                description: item.description,
+                school: item.school || ownerRecord?.school || (item.location?.toLowerCase().includes("wukari") ? "Federal University Wukari" : "Campus"),
+                features: [
+                  { label: "Borehole Water", icon: Building2 },
+                  { label: "Prepaid Meter", icon: Zap },
+                  { label: "Gated Guard", icon: ShieldCheck }
+                ],
+                host: {
+                  initials: hostInitials,
+                  name: hostName,
+                  role: hostRole,
+                  badge: "Verified Lodge",
+                  badgeColor: "bg-brand-magenta/20 text-brand-magenta-light border-brand-magenta/30",
+                  whatsapp: ownerRecord?.whatsapp_number || item.whatsapp_link || item.host_whatsapp || "",
+                  phone: ownerRecord?.phone_number || item.owner_phone || item.host_phone || ""
+                }
+              };
+            });
 
           setHousingListings((prev) => {
             const liveIds = new Set(formattedHouses.map((h) => h.id));
-            return [...formattedHouses, ...prev.filter((p) => !liveIds.has(p.id))];
+            return [...formattedHouses, ...prev.filter((p) => !isListingDeleted(p.id) && !liveIds.has(p.id))];
           });
         }
 
         if (marketRes?.success && marketRes.items?.length > 0) {
-          const formattedProducts: MarketItem[] = marketRes.items.map((item: any) => {
-            const rawImages = item.images && item.images.length > 0 ? item.images : [item.image || "https://images.unsplash.com/photo-1594980596870-8aa52a78d8cd?w=400&auto=format&fit=crop&q=80"];
-            return {
-              id: item.id,
-              title: item.title,
-              category: item.category || "electronics",
-              conditionBadge: item.condition_badge || "Like New",
-              conditionColor: item.condition_color || "bg-[#1E293B]/80 text-emerald-300 border-emerald-500/30",
-              price: Number(item.price) || 15000,
-              originalPrice: item.original_price ? Number(item.original_price) : undefined,
-              isNegotiable: item.is_negotiable ?? true,
-              location: item.location || item.campus_location || "Campus Gate",
-              postedTime: "Just now",
-              seller: {
-                name: item.seller_name || item.seller?.name || "Verified Student",
-                level: item.seller_level || item.seller?.level || "300 Level",
-                avatar: item.seller_avatar || item.seller?.avatar || "",
-                verified: true,
-                whatsapp: item.seller_whatsapp || item.seller?.whatsapp || ""
-              },
-              image: rawImages[0],
-              images: rawImages,
-              description: item.description || "Student pre-loved campus item."
-            };
-          });
+          const formattedProducts: MarketItem[] = marketRes.items
+            .filter((item: any) => !isListingDeleted(item.id))
+            .map((item: any) => {
+              const rawImages = item.images && item.images.length > 0 ? item.images : [item.image || "https://images.unsplash.com/photo-1594980596870-8aa52a78d8cd?w=400&auto=format&fit=crop&q=80"];
+              return {
+                id: item.id,
+                title: item.title,
+                category: item.category || "electronics",
+                conditionBadge: item.condition_badge || "Like New",
+                conditionColor: item.condition_color || "bg-[#1E293B]/80 text-emerald-300 border-emerald-500/30",
+                price: Number(item.price) || 15000,
+                originalPrice: item.original_price ? Number(item.original_price) : undefined,
+                isNegotiable: item.is_negotiable ?? true,
+                location: item.location || item.campus_location || "Campus Gate",
+                postedTime: "Just now",
+                seller: {
+                  name: item.seller_name || item.seller?.name || "Verified Student",
+                  level: item.seller_level || item.seller?.level || "300 Level",
+                  avatar: item.seller_avatar || item.seller?.avatar || "",
+                  verified: true,
+                  whatsapp: item.seller_whatsapp || item.seller?.whatsapp || ""
+                },
+                image: rawImages[0],
+                images: rawImages,
+                description: item.description || "Student pre-loved campus item."
+              };
+            });
 
           setMarketItems((prev) => {
             const liveIds = new Set(formattedProducts.map((p) => p.id));
-            return [...formattedProducts, ...prev.filter((p) => !liveIds.has(p.id))];
+            return [...formattedProducts, ...prev.filter((p) => !isListingDeleted(p.id) && !liveIds.has(p.id))];
           });
         }
       } catch (err) {
@@ -187,6 +194,18 @@ export default function HomeFeedPage() {
       }
     };
     loadLiveData();
+
+    // 3. Reactive listener for deletions across the app
+    const handleListingDeleted = (e: any) => {
+      const deletedId = e?.detail?.id;
+      if (deletedId) {
+        setHousingListings((prev) => prev.filter((h) => String(h.id) !== String(deletedId)));
+        setMarketItems((prev) => prev.filter((p) => String(p.id) !== String(deletedId)));
+      }
+    };
+
+    window.addEventListener("campsnest:listing_deleted", handleListingDeleted);
+    return () => window.removeEventListener("campsnest:listing_deleted", handleListingDeleted);
   }, []);
 
   const toggleBookmark = (id: string) => {

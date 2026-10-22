@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { compressMarketImage } from "@/lib/utils";
 import { createMarketItemAction } from "@/lib/market/actions";
+import { recordMyCreatedListingId, normalizePhoneNumber } from "@/lib/listing-storage";
 
 export interface PublishedItem {
   id: string;
@@ -135,15 +136,26 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
   const [description, setDescription] = React.useState("");
   const [location, setLocation] = React.useState(CAMPUS_LOCATIONS[0]);
   const [customLocation, setCustomLocation] = React.useState("");
+  const [whatsappPhone, setWhatsappPhone] = React.useState(profile?.whatsapp_number || profile?.phone_number || "");
   const [isPublishing, setIsPublishing] = React.useState(false);
+
+  // Sync profile phone number if loaded asynchronously
+  React.useEffect(() => {
+    if (profile?.whatsapp_number || profile?.phone_number) {
+      setWhatsappPhone((prev) => prev || profile.whatsapp_number || profile.phone_number || "");
+    }
+  }, [profile]);
 
   // Reset when opened
   React.useEffect(() => {
     if (isOpen) {
       setStep(1);
       setIsPublishing(false);
+      if (profile?.whatsapp_number || profile?.phone_number) {
+        setWhatsappPhone((prev) => prev || profile.whatsapp_number || profile.phone_number || "");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, profile]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -191,6 +203,8 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
     const finalImages = imagesList.length > 0 ? imagesList : [coverPhoto];
     const finalSchool = currentCampus || profile?.school || "Federal University Wukari";
 
+    const resolvedWhatsapp = normalizePhoneNumber(whatsappPhone || profile?.whatsapp_number || profile?.phone_number) || "2348134351762";
+
     const newItem: PublishedItem & { school?: string } = {
       id: `item-${Date.now()}`,
       title: title.trim(),
@@ -213,12 +227,14 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
         level: profile?.level || "300 Level",
         avatar: sellerAvatar,
         verified: true,
-        whatsapp: profile?.whatsapp_number || profile?.phone_number || "2348134351762",
+        whatsapp: resolvedWhatsapp,
       }
     };
 
+    let assignedId = `item-${Date.now()}`;
+
     try {
-      await createMarketItemAction({
+      const res = await createMarketItemAction({
         seller_id: profile?.id,
         title: title.trim(),
         description: description.trim() || "Clean, verified item in great condition.",
@@ -235,13 +251,34 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
         seller_name: profile?.name || "Verified Student",
         seller_level: profile?.level || "300 Level",
         seller_avatar: sellerAvatar,
-        seller_whatsapp: profile?.whatsapp_number || profile?.phone_number || "2348134351762",
+        seller_whatsapp: resolvedWhatsapp,
       });
+
+      if (res?.item?.id) {
+        assignedId = String(res.item.id);
+      }
     } catch (err) {
       console.warn("DB save warning caught:", err);
     }
 
-    onPublish(newItem);
+    const finalItem: PublishedItem & { school?: string } = {
+      ...newItem,
+      id: assignedId,
+    };
+
+    // 1. Permanently record ownership on this browser/device
+    recordMyCreatedListingId(assignedId);
+
+    // 2. Persist in client custom items
+    if (typeof window !== "undefined") {
+      try {
+        const existing = JSON.parse(localStorage.getItem("campsnest_custom_market_items") || "[]");
+        const updated = [finalItem, ...existing.filter((i: any) => String(i.id) !== assignedId)];
+        localStorage.setItem("campsnest_custom_market_items", JSON.stringify(updated));
+      } catch (e) {}
+    }
+
+    onPublish(finalItem);
     setIsPublishing(false);
     setStep(4);
   };
@@ -700,6 +737,31 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
                   placeholder="e.g. Clean device, battery health 92%, comes with original fast charger."
                   className="w-full rounded-2xl bg-white/[0.04] border border-white/15 p-3 text-xs text-white placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-brand-violet resize-none"
                 />
+              </div>
+
+              {/* Direct WhatsApp Contact Phone */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-text-dim block">
+                    WhatsApp Chat Number <span className="text-brand-magenta">*</span>
+                  </label>
+                  <span className="text-[10px] text-emerald-400 font-semibold">Direct Buyer Inquiries</span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-emerald-400 pointer-events-none">
+                    💬
+                  </span>
+                  <input
+                    type="tel"
+                    value={whatsappPhone}
+                    onChange={(e) => setWhatsappPhone(e.target.value)}
+                    placeholder="e.g. 08134351762 (from your profile)"
+                    className="w-full h-11 rounded-2xl bg-[#1C153B] border border-white/15 pl-10 pr-4 text-xs font-semibold text-white placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-brand-violet"
+                  />
+                </div>
+                <p className="text-[10px] text-text-dim">
+                  Auto-filled from your sign-up account. Buyers can tap to chat with you directly on WhatsApp.
+                </p>
               </div>
 
               {/* Live Preview Card */}

@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { formatCurrency } from "@/lib/utils";
 import { BrandLogo } from "@/components/common/brand-logo";
+import { CAMPUS_LIST } from "@/lib/constants";
 
 
 const SLIDES = [
@@ -205,15 +206,15 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 2. STATS & CAMPUS TRUST RIBBON */}
       {/* ========================================================================= */}
-      <section className="bg-canvas-card border-y border-white/10 py-8 px-6 lg:px-16">
+      <section className="bg-[#120F24] border-y border-white/10 py-6 px-4 sm:px-6 lg:px-12">
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           <div className="space-y-1">
             <div className="text-2xl sm:text-3xl font-heading font-extrabold text-white">500+</div>
-            <div className="text-xs text-text-muted">Verified Campus Hostels</div>
+            <div className="text-xs text-text-muted">Verified Campus Lodges</div>
           </div>
           <div className="space-y-1">
             <div className="text-2xl sm:text-3xl font-heading font-extrabold text-brand-magenta-light">₦0</div>
-            <div className="text-xs text-text-muted">Marketplace Listing Fees</div>
+            <div className="text-xs text-text-muted">Hidden Agent & Agreement Fees</div>
           </div>
           <div className="space-y-1">
             <div className="text-2xl sm:text-3xl font-heading font-extrabold text-brand-violet-light">96%</div>
@@ -221,264 +222,375 @@ export default function LandingPage() {
           </div>
           <div className="space-y-1">
             <div className="text-2xl sm:text-3xl font-heading font-extrabold text-emerald-400">100%</div>
-            <div className="text-xs text-text-muted">Student KYC Verified</div>
+            <div className="text-xs text-text-muted">Student-Verified Profiles</div>
           </div>
         </div>
       </section>
 
       {/* ========================================================================= */}
-      {/* 3. CORE ECOSYSTEM PILLARS (Housing 2.0, Marketplace, Connect) */}
+      {/* 3. THE 3 CORE PILLARS — BALANCED 3-COLUMN CAMPUS GRID */}
       {/* ========================================================================= */}
-      <div className="max-w-7xl mx-auto px-6 lg:px-16 py-20 space-y-24">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-16 lg:py-20 space-y-12">
         
-        {/* Pillar 1: Housing 2.0 */}
-        <section id="housing" className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-6 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-violet/20 border border-brand-violet/40 text-brand-violet-light text-xs font-bold uppercase">
-              <Building2 className="h-3.5 w-3.5" />
-              <span>Campus Accommodation</span>
-            </div>
-
-            <h2 className="text-3xl sm:text-4xl font-heading font-extrabold text-white tracking-tight leading-tight">
-              Student Housing Without <br />
-              <span className="bg-gradient-to-r from-brand-violet-light to-brand-magenta-light bg-clip-text text-transparent">
-                The Agents Hassle.
-              </span>
-            </h2>
-
-            <p className="text-sm text-text-secondary leading-relaxed">
-              Skip overpriced agent runs. Search student-friendly self-contains, single rooms, and shared apartments near your campus gate. Inspect physically with host verification before paying rent.
-            </p>
-
-            <ul className="space-y-2.5 text-xs text-text-secondary">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Verified physical inspection bookings with verified hosts.</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Filters for distance to lecture halls, prepaid light & security.</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Zero hidden agency fees. Strict student safety protocols.</span>
-              </li>
-            </ul>
-
-            <div className="pt-2">
-              <Link href="/home">
-                <Button variant="primary" size="default">
-                  <span>Enter Housing Hub</span>
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </Link>
-            </div>
+        {/* Section Header */}
+        <div className="text-center max-w-2xl mx-auto space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.06] border border-white/15 text-xs font-bold uppercase tracking-wider text-brand-violet-light">
+            <Building2 className="h-3.5 w-3.5" />
+            <span>The Campus Ecosystem</span>
           </div>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-extrabold text-white tracking-tight leading-tight">
+            Everything Built For Real Campus Life.
+          </h2>
+          <p className="text-xs sm:text-sm text-text-secondary leading-relaxed">
+            No overpriced street agents. No scam deposits in WhatsApp groups. Just verified accommodation, peer-to-peer student deals, and flatmate matching.
+          </p>
+        </div>
 
-          <div className="lg:col-span-6">
-            <GlassCard elevation="elevated" glow="violet" className="p-5 space-y-4">
-              <div className="relative h-64 w-full rounded-2xl overflow-hidden">
+        {/* 3 Pillar Cards in Balanced Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 items-stretch">
+          
+          {/* Card 1: Student Housing */}
+          <div id="housing" className="rounded-3xl bg-[#16122C] border border-white/10 hover:border-brand-violet/40 transition-all p-5 flex flex-col justify-between space-y-5 group">
+            <div className="space-y-4">
+              {/* Photo Container */}
+              <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-gradient-to-br from-[#1E193C] via-[#2A1D4E] to-[#141029] flex items-center justify-center border border-white/10">
+                {/* Fallback Graphic (rendered natively so it NEVER fails) */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center select-none pointer-events-none">
+                  <div className="h-12 w-12 rounded-2xl bg-brand-violet/20 border border-brand-violet/40 text-brand-violet-light flex items-center justify-center mb-2 shadow-inner">
+                    <Building2 className="h-6 w-6" />
+                  </div>
+                  <span className="text-xs font-bold text-white tracking-wide">Campus Lodge Suite</span>
+                  <span className="text-[10px] text-text-dim">Fully Tiled • Prepaid Meter • Water</span>
+                </div>
+
                 <img
                   src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=700&auto=format&fit=crop&q=80"
-                  alt="Hostel Room"
-                  className="h-full w-full object-cover"
+                  alt=""
+                  onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                  className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-                <div className="absolute top-3 left-3 flex gap-2">
-                  <Badge variant="verified" dot>Verified Host</Badge>
-                  <Badge variant="success">Available Now</Badge>
+                <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/90 text-[10px] font-bold text-white shadow">
+                    Verified Host
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-xs text-[10px] font-bold text-white border border-white/20">
+                    No Agent Fee
+                  </span>
                 </div>
-                <div className="absolute bottom-3 right-3">
-                  <span className="px-3.5 py-1 rounded-full bg-canvas-midnight/90 backdrop-blur-md text-xs font-extrabold text-white border border-white/20">
-                    {formatCurrency(180000)} / year
+                <div className="absolute bottom-2.5 right-2.5 z-10">
+                  <span className="px-3 py-1 rounded-full bg-[#0B0819]/90 backdrop-blur-md text-xs font-extrabold text-white border border-white/20">
+                    ₦180,000 / yr
                   </span>
                 </div>
               </div>
 
-              <div className="space-y-1">
+              {/* Card Meta */}
+              <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs text-text-dim">
                   <span className="font-semibold text-brand-violet-light">Self Contain</span>
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5 text-brand-magenta" />
-                    500m from North Gate
+                  <span className="flex items-center gap-1 text-[11px]">
+                    <MapPin className="h-3 w-3 text-brand-magenta" />
+                    500m to North Gate
                   </span>
                 </div>
-                <h4 className="text-base font-bold text-white">Modern Self Contain with Prepaid Meter</h4>
-                <p className="text-xs text-text-secondary">24/7 Security Guard, Running Borehole Water, Clean Compound.</p>
+                <h3 className="text-base font-bold text-white leading-snug">
+                  Modern Self Contain with Prepaid Meter
+                </h3>
+                <p className="text-xs text-text-secondary line-clamp-2">
+                  Running borehole water, fenced compound with night security, walking distance to lecture theaters.
+                </p>
               </div>
-            </GlassCard>
-          </div>
-        </section>
 
-        {/* Pillar 2: Campus Marketplace */}
-        <section id="marketplace" className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-6 order-2 lg:order-1">
-            <GlassCard elevation="elevated" glow="magenta" className="p-5 space-y-4">
-              <div className="relative h-64 w-full rounded-2xl overflow-hidden">
+              {/* Feature Highlights */}
+              <ul className="space-y-2 text-[11px] text-text-secondary border-t border-white/10 pt-3">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Physical inspection booking before payment</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Direct contact with lodge host via WhatsApp</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Zero hidden agency or agreement charges</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-4 border-t border-white/10">
+              <Link href="/housing" className="block w-full">
+                <button className="w-full py-3 px-4 rounded-full bg-white/[0.08] hover:bg-brand-violet text-white text-xs font-bold transition-all flex items-center justify-center gap-2 border border-white/15 hover:border-transparent cursor-pointer">
+                  <span>Explore Campus Housing</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Card 2: Campus Marketplace */}
+          <div id="marketplace" className="rounded-3xl bg-[#16122C] border border-white/10 hover:border-brand-magenta/40 transition-all p-5 flex flex-col justify-between space-y-5 group">
+            <div className="space-y-4">
+              {/* Photo Container */}
+              <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-gradient-to-br from-[#271333] via-[#3B1948] to-[#180E24] flex items-center justify-center border border-white/10">
+                {/* Fallback Graphic */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center select-none pointer-events-none">
+                  <div className="h-12 w-12 rounded-2xl bg-brand-magenta/20 border border-brand-magenta/40 text-brand-magenta-light flex items-center justify-center mb-2 shadow-inner">
+                    <ShoppingBag className="h-6 w-6" />
+                  </div>
+                  <span className="text-xs font-bold text-white tracking-wide">Campus Tech & Gadgets</span>
+                  <span className="text-[10px] text-text-dim">Verified Student Seller • Daylight Meetup</span>
+                </div>
+
                 <img
                   src="https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=700&auto=format&fit=crop&q=80"
-                  alt="Gadget"
-                  className="h-full w-full object-cover"
+                  alt=""
+                  onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                  className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-                <div className="absolute top-3 left-3 flex gap-2">
-                  <Badge variant="vibe">Like New</Badge>
-                  <Badge variant="default">Computers</Badge>
+                <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
+                  <span className="px-2.5 py-0.5 rounded-full bg-brand-magenta/90 text-[10px] font-bold text-white shadow">
+                    Student Verified
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-xs text-[10px] font-bold text-white border border-white/20">
+                    Computers
+                  </span>
                 </div>
-                <div className="absolute bottom-3 right-3">
-                  <span className="px-3.5 py-1 rounded-full bg-canvas-midnight/90 backdrop-blur-md text-xs font-extrabold text-white border border-white/20">
-                    {formatCurrency(260000)}
+                <div className="absolute bottom-2.5 right-2.5 z-10">
+                  <span className="px-3 py-1 rounded-full bg-[#0B0819]/90 backdrop-blur-md text-xs font-extrabold text-white border border-white/20">
+                    ₦260,000
                   </span>
                 </div>
               </div>
 
-              <div className="space-y-1">
+              {/* Card Meta */}
+              <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs text-text-dim">
-                  <span className="font-semibold text-brand-magenta-light">MacBook Pro M1</span>
-                  <span>Hostel Block B</span>
+                  <span className="font-semibold text-brand-magenta-light">Like New • Mint</span>
+                  <span className="flex items-center gap-1 text-[11px]">
+                    <MapPin className="h-3 w-3 text-brand-magenta" />
+                    Hostel Block B
+                  </span>
                 </div>
-                <h4 className="text-base font-bold text-white">Apple MacBook Pro 8GB/256GB</h4>
-                <p className="text-xs text-text-secondary">Sold by John D. (300L Computer Science) • In-app Chat</p>
+                <h3 className="text-base font-bold text-white leading-snug">
+                  Apple MacBook Pro M1 8GB/256GB
+                </h3>
+                <p className="text-xs text-text-secondary line-clamp-2">
+                  Sold by John D. (300L Computer Science). Pristine condition, battery health 91%, comes with charger.
+                </p>
               </div>
-            </GlassCard>
-          </div>
 
-          <div className="lg:col-span-6 order-1 lg:order-2 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-magenta/20 border border-brand-magenta/40 text-brand-magenta-light text-xs font-bold uppercase">
-              <ShoppingBag className="h-3.5 w-3.5" />
-              <span>Campus Marketplace</span>
+              {/* Feature Highlights */}
+              <ul className="space-y-2 text-[11px] text-text-secondary border-t border-white/10 pt-3">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Meet safely in broad daylight on campus</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>In-app chat & direct seller WhatsApp link</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Zero commission fees. 100% student pricing</span>
+                </li>
+              </ul>
             </div>
 
-            <h2 className="text-3xl sm:text-4xl font-heading font-extrabold text-white tracking-tight leading-tight">
-              Buy & Sell With Students <br />
-              <span className="bg-gradient-to-r from-brand-magenta-light to-brand-blue-light bg-clip-text text-transparent">
-                Right On Your Campus.
-              </span>
-            </h2>
-
-            <p className="text-sm text-text-secondary leading-relaxed">
-              Moving out? Upgrading your phone? Need textbooks or hostel fans? List items in 60 seconds and meet safely in daylight on campus.
-            </p>
-
-            <ul className="space-y-2.5 text-xs text-text-secondary">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Zero commission. Keep 100% of your selling price.</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Verified student badge with department and university tagging.</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>In-app buyer/seller messaging with context badges.</span>
-              </li>
-            </ul>
-
-            <div className="pt-2">
-              <Link href="/home">
-                <Button variant="secondary" size="default">
-                  <span>Browse Campus Market</span>
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* Pillar 3: Connect & Vibe Matching */}
-        <section id="connect" className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-6 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-brand-violet/20 to-brand-magenta/20 border border-brand-magenta/40 text-brand-magenta-light text-xs font-bold uppercase">
-              <Heart className="h-3.5 w-3.5" />
-              <span>CampsNest Connect</span>
-            </div>
-
-            <h2 className="text-3xl sm:text-4xl font-heading font-extrabold text-white tracking-tight leading-tight">
-              Find Flatmates & Friends <br />
-              <span className="bg-gradient-to-r from-brand-violet-light via-brand-magenta-light to-brand-blue-light bg-clip-text text-transparent">
-                Who Match Your Vibe.
-              </span>
-            </h2>
-
-            <p className="text-sm text-text-secondary leading-relaxed">
-              Answer 10 fun questions about your study habits, sleep schedule, music tastes, and weekend routine. Our algorithm finds students you will genuinely click with.
-            </p>
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Badge variant="vibe">🎧 Afrobeats</Badge>
-              <Badge variant="default">🌙 Night Owl</Badge>
-              <Badge variant="default">📚 Silent Study</Badge>
-              <Badge variant="default">☕ Coffee Lover</Badge>
-            </div>
-
-            <div className="pt-2">
-              <Link href="/home">
-                <Button variant="primary" size="default">
-                  <span>Take 2-Min Vibe Quiz</span>
-                  <Sparkles className="h-4 w-4 ml-2" />
-                </Button>
+            <div className="pt-4 border-t border-white/10">
+              <Link href="/market" className="block w-full">
+                <button className="w-full py-3 px-4 rounded-full bg-white/[0.08] hover:bg-brand-magenta text-white text-xs font-bold transition-all flex items-center justify-center gap-2 border border-white/15 hover:border-transparent cursor-pointer">
+                  <span>Browse Student Marketplace</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </Link>
             </div>
           </div>
 
-          <div className="lg:col-span-6">
-            <GlassCard elevation="elevated" glow="blue" className="p-6 space-y-5 border-white/20">
-              <div className="flex items-center justify-between">
-                <Badge variant="vibe" dot>94% Match ✨</Badge>
-                <span className="text-xs font-bold text-brand-violet-light">Top Tier Affinity</span>
-              </div>
+          {/* Card 3: Connect & Roommates */}
+          <div id="connect" className="rounded-3xl bg-[#16122C] border border-white/10 hover:border-brand-blue/40 transition-all p-5 flex flex-col justify-between space-y-5 group">
+            <div className="space-y-4">
+              {/* Match Profile Preview */}
+              <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-gradient-to-br from-[#1E1B4B] via-[#2E1065] to-[#1E1B4B] border border-white/10 p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="px-2.5 py-0.5 rounded-full bg-brand-violet/40 text-[10px] font-bold text-white border border-brand-violet/50 flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-brand-magenta-light" />
+                    94% Vibe Match
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-bold">FU Wukari</span>
+                </div>
 
-              <div className="flex items-center gap-4">
-                <Avatar
-                  size="xl"
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"
-                  glow
-                  online
-                  className="h-16 w-16"
-                />
-                <div>
-                  <h4 className="text-base font-bold text-white">Stephen E.</h4>
-                  <p className="text-xs text-text-secondary">300L Computer Science • FUW</p>
-                  <p className="text-[11px] text-emerald-400 font-semibold">Looking for Quiet Flatmate</p>
+                <div className="flex items-center gap-3">
+                  <div className="relative h-12 w-12 rounded-full overflow-hidden bg-gradient-to-tr from-brand-violet to-brand-magenta flex items-center justify-center text-white font-extrabold text-sm border-2 border-brand-magenta shadow shrink-0">
+                    <span>SE</span>
+                    <img
+                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
+                      alt=""
+                      onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">Stephen E.</h4>
+                    <p className="text-[10px] text-text-secondary">300L Computer Science</p>
+                    <p className="text-[9px] text-emerald-300 font-semibold">Looking for Quiet Flatmate</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="px-2 py-0.5 rounded-md bg-white/10 text-[9px] text-white">🌙 Night Owl</span>
+                  <span className="px-2 py-0.5 rounded-md bg-white/10 text-[9px] text-white">📚 Silent Study</span>
+                  <span className="px-2 py-0.5 rounded-md bg-white/10 text-[9px] text-white">🎧 Afrobeats</span>
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-3 text-xs text-text-secondary">
-                <span className="font-bold text-white">Why you connect: </span>
-                You both code late at night, listen to Burna Boy, and prefer library quiet floors.
+              {/* Card Meta */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs text-text-dim">
+                  <span className="font-semibold text-brand-blue-light">Roommate Matching</span>
+                  <span className="flex items-center gap-1 text-[11px] text-emerald-400">
+                    High Compatibility
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white leading-snug">
+                  Match Flatmates Who Share Your Schedule
+                </h3>
+                <p className="text-xs text-text-secondary line-clamp-2">
+                  Answer 10 quick lifestyle questions. Connect with course mates and future roommates who match your energy and hygiene standards.
+                </p>
               </div>
 
-              <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                <span className="text-xs text-text-dim">Roommate Sync: High</span>
-                <Link href="/home">
-                  <Button variant="primary" size="sm" className="text-xs">
-                    Connect 💕
-                  </Button>
-                </Link>
-              </div>
-            </GlassCard>
+              {/* Feature Highlights */}
+              <ul className="space-y-2 text-[11px] text-text-secondary border-t border-white/10 pt-3">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>2-minute lifestyle, sleep & study habits quiz</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Avoid bad roommates before signing tenancy</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Privacy-protected student verified profiles</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-4 border-t border-white/10">
+              <Link href="/connect" className="block w-full">
+                <button className="w-full py-3 px-4 rounded-full bg-white/[0.08] hover:bg-brand-blue text-white text-xs font-bold transition-all flex items-center justify-center gap-2 border border-white/15 hover:border-transparent cursor-pointer">
+                  <span>Start 2-Min Vibe Quiz</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </Link>
+            </div>
           </div>
-        </section>
 
-      </div>
+        </div>
+      </section>
 
       {/* ========================================================================= */}
-      {/* 4. FINAL CALL TO ACTION BANNER */}
+      {/* 4. REAL PROBLEM SOLVER: CAMPSNEST VS STREET AGENTS */}
       {/* ========================================================================= */}
-      <section className="px-6 lg:px-16 py-16">
-        <div className="max-w-5xl mx-auto rounded-3xl p-8 sm:p-12 text-center bg-gradient-to-r from-blue-700 via-purple-700 to-pink-600 border border-white/20 shadow-2xl space-y-6 relative overflow-hidden">
+      <section className="bg-[#120F24] border-y border-white/10 py-16 px-4 sm:px-6 lg:px-12">
+        <div className="max-w-7xl mx-auto space-y-10">
+          <div className="text-center max-w-2xl mx-auto space-y-2">
+            <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">
+              Why Students Rely on CampsNest
+            </h2>
+            <p className="text-xs sm:text-sm text-text-secondary">
+              Campus life in Nigeria has enough challenges. Finding a decent room or selling your mini-fridge shouldn&apos;t be one of them.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 rounded-2xl bg-[#16122C] border border-white/10 space-y-3">
+              <div className="h-10 w-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-sm">
+                ₦0
+              </div>
+              <h3 className="text-base font-bold text-white">No Agent Exploitation</h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Offline agents charge up to ₦30,000 to ₦50,000 for &quot;agreement and agency commission&quot;. On CampsNest, you deal directly with the property host or student tenant with zero middleman markup.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-[#16122C] border border-white/10 space-y-3">
+              <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <h3 className="text-base font-bold text-white">Inspect Before You Pay</h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Never send money blindly into a WhatsApp account. Book verified daylight inspections at the hostel gate to verify prepaid meters, running borehole, and security before closing.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-[#16122C] border border-white/10 space-y-3">
+              <div className="h-10 w-10 rounded-xl bg-brand-violet/20 border border-brand-violet/30 text-brand-violet-light flex items-center justify-center font-bold text-sm">
+                <Users className="h-5 w-5" />
+              </div>
+              <h3 className="text-base font-bold text-white">Verified Campus Community</h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Every host, seller, and roommate is tagged with their Nigerian university and faculty. Chat directly on WhatsApp or in-app with real students on your own campus.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 5. ACTIVE UNIVERSITY CAMPUSES */}
+      {/* ========================================================================= */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-14 space-y-6 text-center">
+        <div className="space-y-1">
+          <p className="text-xs font-bold uppercase tracking-wider text-text-dim">
+            Serving University Students Nationwide
+          </p>
+          <h3 className="text-lg sm:text-xl font-bold text-white">
+            Available Across Top Nigerian Campuses
+          </h3>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-2 max-w-4xl mx-auto">
+          {CAMPUS_LIST.slice(0, 10).map((campus) => (
+            <Link
+              key={campus.id}
+              href="/housing"
+              className="px-3.5 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-semibold text-text-secondary hover:text-white transition-all flex items-center gap-1.5"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-violet shrink-0" />
+              <span>{campus.name}</span>
+            </Link>
+          ))}
+        </div>
+        <p className="text-[11px] text-text-dim">
+          Switch your campus from the header anytime to filter local hostels and items near your school gate.
+        </p>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 6. REFINED CALL TO ACTION BANNER */}
+      {/* ========================================================================= */}
+      <section className="px-4 sm:px-6 lg:px-12 pb-16">
+        <div className="max-w-5xl mx-auto rounded-3xl p-8 sm:p-12 text-center bg-[#181333] border border-white/15 shadow-2xl space-y-6 relative overflow-hidden">
           <div className="space-y-3 relative z-10 max-w-xl mx-auto">
-            <h2 className="text-3xl sm:text-4xl font-heading font-extrabold text-white">
-              Ready to Upgrade Your Campus Life?
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-extrabold text-white">
+              Ready for a Simpler Campus Life?
             </h2>
-            <p className="text-xs sm:text-sm text-white/90">
-              Join thousands of university students discovering better housing, peer marketplace deals, and roommate matches.
+            <p className="text-xs sm:text-sm text-text-secondary">
+              Join thousands of university students discovering verified lodges, trading gear without fees, and finding compatible flatmates.
             </p>
           </div>
 
-          <div className="relative z-10 flex flex-wrap items-center justify-center gap-4">
+          <div className="relative z-10 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+            <Link href="/signup">
+              <button className="h-11 sm:h-12 px-6 sm:px-8 rounded-full bg-white text-[#120F24] text-xs sm:text-sm font-bold shadow-xl hover:bg-white/95 hover:scale-105 active:scale-95 transition-all cursor-pointer">
+                Create Free Account
+              </button>
+            </Link>
             <Link href="/home">
-              <button className="h-12 px-8 rounded-full bg-white text-[#1E1B4B] text-sm font-bold shadow-xl hover:scale-105 active:scale-95 transition-all">
-                Enter CampsNest 2.0
+              <button className="h-11 sm:h-12 px-6 sm:px-8 rounded-full bg-white/[0.08] hover:bg-white/[0.12] text-white text-xs sm:text-sm font-bold border border-white/20 hover:scale-105 active:scale-95 transition-all cursor-pointer">
+                Explore App Feed
               </button>
             </Link>
           </div>
@@ -486,18 +598,27 @@ export default function LandingPage() {
       </section>
 
       {/* ========================================================================= */}
-      {/* 5. FOOTER */}
+      {/* 7. FOOTER */}
       {/* ========================================================================= */}
-      <footer id="about" className="border-t border-white/10 bg-canvas-card/80 py-10 px-6 lg:px-16 text-xs text-text-muted">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <BrandLogo size="sm" showSlogan href="/" />
+      <footer id="about" className="border-t border-white/10 bg-[#0E0C1C] py-10 px-4 sm:px-6 lg:px-12 text-xs text-text-muted">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-1 text-center md:text-left">
+            <BrandLogo size="sm" showSlogan href="/" />
+            <p className="text-[11px] text-text-dim">
+              The all-in-one student superapp for Nigerian university campuses.
+            </p>
+          </div>
 
-          <div className="flex items-center gap-4 text-slate-400">
-            <Link href="/privacy" className="hover:text-purple-300 transition-colors">Privacy Policy</Link>
-            <span>•</span>
-            <Link href="/terms" className="hover:text-pink-300 transition-colors">Terms of Service</Link>
-            <span>•</span>
-            <span>© {new Date().getFullYear()} CampsNest</span>
+          <div className="flex flex-wrap items-center justify-center gap-6 text-text-secondary text-xs">
+            <Link href="/housing" className="hover:text-white transition-colors">Campus Housing</Link>
+            <Link href="/market" className="hover:text-white transition-colors">Marketplace</Link>
+            <Link href="/connect" className="hover:text-white transition-colors">Roommate Quiz</Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+          </div>
+
+          <div className="text-[11px] text-text-dim text-center md:text-right">
+            © {new Date().getFullYear()} CampsNest. All rights reserved.
           </div>
         </div>
       </footer>

@@ -28,6 +28,7 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import { compressHouseImage, isVideoUrl } from "@/lib/utils";
 import { createHousingListingAction } from "@/lib/housing/actions";
 import { HousingItem } from "@/lib/housing/constants";
+import { recordMyCreatedListingId, normalizePhoneNumber } from "@/lib/listing-storage";
 
 export interface PublishedHouse {
   id: string;
@@ -111,14 +112,25 @@ export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: Po
   const [image, setImage] = React.useState(SAMPLE_HOUSE_PHOTOS[0]);
   const [imagesList, setImagesList] = React.useState<string[]>([SAMPLE_HOUSE_PHOTOS[0]]);
   const [selectedAmenities, setSelectedAmenities] = React.useState<string[]>(["water", "prepaid", "security"]);
+  const [whatsappPhone, setWhatsappPhone] = React.useState(profile?.whatsapp_number || profile?.phone_number || "");
   const [isPublishing, setIsPublishing] = React.useState(false);
+
+  // Sync profile phone number if loaded asynchronously
+  React.useEffect(() => {
+    if (profile?.whatsapp_number || profile?.phone_number) {
+      setWhatsappPhone((prev) => prev || profile.whatsapp_number || profile.phone_number || "");
+    }
+  }, [profile]);
 
   React.useEffect(() => {
     if (isOpen) {
       setStep(1);
       setIsPublishing(false);
+      if (profile?.whatsapp_number || profile?.phone_number) {
+        setWhatsappPhone((prev) => prev || profile.whatsapp_number || profile.phone_number || "");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, profile]);
 
   if (!isOpen) return null;
 
@@ -203,14 +215,16 @@ export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: Po
         role: `Verified Host (${finalSchool})`,
         badge: "No Agent Fee",
         badgeColor: "bg-brand-magenta/20 text-brand-magenta-light border-brand-magenta/30",
-        whatsapp: profile?.whatsapp_number || profile?.phone_number || "2348134351762",
-        phone: profile?.phone_number || "08134351762"
+        whatsapp: normalizePhoneNumber(whatsappPhone || profile?.whatsapp_number || profile?.phone_number) || "2348134351762",
+        phone: profile?.phone_number || whatsappPhone || "08134351762"
       }
     };
 
+    let assignedId = newHouse.id;
+
     // 1. Try publishing to Supabase DB via Action
     try {
-      await createHousingListingAction({
+      const res = await createHousingListingAction({
         owner_id: profile?.id,
         title: newHouse.title,
         description: newHouse.description || "Clean, fully tiled student accommodation.",
@@ -228,22 +242,34 @@ export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: Po
         host_whatsapp: newHouse.host.whatsapp,
         host_phone: newHouse.host.phone
       });
+
+      if (res?.item?.id) {
+        assignedId = String(res.item.id);
+      }
     } catch (err) {
       console.warn("Could not save listing to Supabase (offline/mock fallback):", err);
     }
 
-    // 2. Persist to LocalStorage for instant reactive display across all screens
+    const finalHouse = {
+      ...newHouse,
+      id: assignedId,
+    };
+
+    // 2. Permanently record ownership on this browser/device
+    recordMyCreatedListingId(assignedId);
+
+    // 3. Persist to LocalStorage for instant reactive display across all screens
     if (typeof window !== "undefined") {
       try {
         const existing = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
-        const updated = [newHouse, ...existing.filter((h: any) => h.id !== newHouse.id)];
+        const updated = [finalHouse, ...existing.filter((h: any) => String(h.id) !== assignedId)];
         localStorage.setItem("campsnest_custom_lodges", JSON.stringify(updated));
       } catch (e) {
         console.warn("Could not save lodge to localStorage:", e);
       }
     }
 
-    onPublish(newHouse);
+    onPublish(finalHouse);
     setIsPublishing(false);
     setStep(4);
   };
@@ -623,6 +649,31 @@ export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: Po
                   placeholder="e.g. Constant light and water. Clean, gated compound with CCTV surveillance."
                   className="w-full rounded-2xl bg-white/[0.04] border border-white/15 p-3 text-xs text-white focus:outline-none focus:ring-2 focus:ring-brand-violet resize-none"
                 />
+              </div>
+
+              {/* Direct WhatsApp Contact Phone */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-text-dim block">
+                    Host WhatsApp Contact <span className="text-brand-magenta">*</span>
+                  </label>
+                  <span className="text-[10px] text-emerald-400 font-semibold">Direct Student Inquiries</span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-emerald-400 pointer-events-none">
+                    💬
+                  </span>
+                  <input
+                    type="tel"
+                    value={whatsappPhone}
+                    onChange={(e) => setWhatsappPhone(e.target.value)}
+                    placeholder="e.g. 08134351762 (from your profile)"
+                    className="w-full h-11 rounded-2xl bg-[#1C153B] border border-white/15 pl-10 pr-4 text-xs font-semibold text-white placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-brand-violet"
+                  />
+                </div>
+                <p className="text-[10px] text-text-dim">
+                  Auto-filled from your account. Students can tap to chat with you directly on WhatsApp.
+                </p>
               </div>
 
               {/* Live Preview Card */}

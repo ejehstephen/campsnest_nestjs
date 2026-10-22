@@ -3,16 +3,16 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { 
-  ArrowLeft, 
-  ShieldCheck, 
-  Bell, 
-  Lock, 
-  User, 
-  Moon, 
-  Globe, 
-  LogOut, 
-  Check, 
+import {
+  ArrowLeft,
+  ShieldCheck,
+  Bell,
+  Lock,
+  User,
+  Moon,
+  Globe,
+  LogOut,
+  Check,
   ChevronRight,
   Shield,
   HelpCircle,
@@ -90,7 +90,7 @@ export default function SettingsPage() {
           localStorage.removeItem("campsnest_local_market_items");
           localStorage.removeItem("campsnest_local_housing_items");
           localStorage.removeItem("campsnest_questionnaire_answers");
-        } catch (e) {}
+        } catch (e) { }
       }
 
       await signOut();
@@ -291,7 +291,7 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <div className="space-y-6 pb-24 max-w-3xl mx-auto animate-fade-in-up">
-        
+
         {/* ========================================================================= */}
         {/* 1. TOP HEADER */}
         {/* ========================================================================= */}
@@ -334,7 +334,7 @@ export default function SettingsPage() {
         {/* 2. SETTINGS SECTIONS LIST */}
         {/* ========================================================================= */}
         <div className="space-y-4">
-          
+
           {/* --------------------------------------------------------------------- */}
           {/* SECTION 1: PRIMARY CAMPUS & INSTITUTION (Persistent across app) */}
           {/* --------------------------------------------------------------------- */}
@@ -463,14 +463,12 @@ export default function SettingsPage() {
 
                 <button
                   onClick={toggleSafeMeetup}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 shrink-0 ${
-                    safeMeetupEnabled ? "bg-brand-blue" : "bg-white/20"
-                  }`}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 shrink-0 ${safeMeetupEnabled ? "bg-brand-blue" : "bg-white/20"
+                    }`}
                 >
                   <div
-                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
-                      safeMeetupEnabled ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${safeMeetupEnabled ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -495,14 +493,12 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={togglePush}
-                  className={`w-12 h-6 rounded-full transition-colors relative p-1 shrink-0 ${
-                    pushNotifications ? "bg-gradient-to-r from-brand-violet to-brand-magenta" : "bg-white/20"
-                  }`}
+                  className={`w-12 h-6 rounded-full transition-colors relative p-1 shrink-0 ${pushNotifications ? "bg-gradient-to-r from-brand-violet to-brand-magenta" : "bg-white/20"
+                    }`}
                 >
                   <div
-                    className={`h-4 w-4 rounded-full bg-white transition-transform ${
-                      pushNotifications ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`h-4 w-4 rounded-full bg-white transition-transform ${pushNotifications ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -515,14 +511,12 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={toggleEmailAlerts}
-                  className={`w-12 h-6 rounded-full transition-colors relative p-1 shrink-0 ${
-                    emailAlerts ? "bg-gradient-to-r from-brand-violet to-brand-magenta" : "bg-white/20"
-                  }`}
+                  className={`w-12 h-6 rounded-full transition-colors relative p-1 shrink-0 ${emailAlerts ? "bg-gradient-to-r from-brand-violet to-brand-magenta" : "bg-white/20"
+                    }`}
                 >
                   <div
-                    className={`h-4 w-4 rounded-full bg-white transition-transform ${
-                      emailAlerts ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`h-4 w-4 rounded-full bg-white transition-transform ${emailAlerts ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -535,14 +529,12 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={toggleSoundAlerts}
-                  className={`w-12 h-6 rounded-full transition-colors relative p-1 shrink-0 ${
-                    soundAlerts ? "bg-gradient-to-r from-brand-violet to-brand-magenta" : "bg-white/20"
-                  }`}
+                  className={`w-12 h-6 rounded-full transition-colors relative p-1 shrink-0 ${soundAlerts ? "bg-gradient-to-r from-brand-violet to-brand-magenta" : "bg-white/20"
+                    }`}
                 >
                   <div
-                    className={`h-4 w-4 rounded-full bg-white transition-transform ${
-                      soundAlerts ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`h-4 w-4 rounded-full bg-white transition-transform ${soundAlerts ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -567,14 +559,12 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={toggleOnlineStatus}
-                  className={`w-12 h-6 rounded-full transition-colors relative p-1 shrink-0 ${
-                    showOnlineStatus ? "bg-emerald-500" : "bg-white/20"
-                  }`}
+                  className={`w-12 h-6 rounded-full transition-colors relative p-1 shrink-0 ${showOnlineStatus ? "bg-emerald-500" : "bg-white/20"
+                    }`}
                 >
                   <div
-                    className={`h-4 w-4 rounded-full bg-white transition-transform ${
-                      showOnlineStatus ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`h-4 w-4 rounded-full bg-white transition-transform ${showOnlineStatus ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -587,14 +577,12 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={toggleDirectMessages}
-                  className={`w-12 h-6 rounded-full transition-colors relative p-1 shrink-0 ${
-                    allowDirectMessages ? "bg-emerald-500" : "bg-white/20"
-                  }`}
+                  className={`w-12 h-6 rounded-full transition-colors relative p-1 shrink-0 ${allowDirectMessages ? "bg-emerald-500" : "bg-white/20"
+                    }`}
                 >
                   <div
-                    className={`h-4 w-4 rounded-full bg-white transition-transform ${
-                      allowDirectMessages ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`h-4 w-4 rounded-full bg-white transition-transform ${allowDirectMessages ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -897,11 +885,10 @@ export default function SettingsPage() {
                     <button
                       key={campus.id}
                       onClick={() => handleSelectCampus(campus)}
-                      className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all text-left ${
-                        isCurrent
+                      className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all text-left ${isCurrent
                           ? "bg-brand-violet/20 border border-brand-violet/50 text-white"
                           : "hover:bg-white/[0.05] text-text-secondary hover:text-white border border-transparent"
-                      }`}
+                        }`}
                     >
                       <div className="space-y-0.5">
                         <div className="font-bold text-xs flex items-center gap-2">

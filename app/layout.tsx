@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { AuthProvider } from "@/lib/auth/auth-provider";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -78,6 +79,7 @@ export default function RootLayout({
       <body className="bg-canvas-midnight text-white antialiased min-h-screen selection:bg-brand-magenta/30 selection:text-white overflow-x-hidden" suppressHydrationWarning>
         <AuthProvider>
           {children}
+          <Analytics />
         </AuthProvider>
       </body>
     </html>
