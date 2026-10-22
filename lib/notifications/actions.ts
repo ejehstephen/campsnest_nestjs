@@ -42,9 +42,15 @@ export async function fetchUserNotificationsAction(): Promise<{
       return { success: false, notifications: [], error: error.message };
     }
 
+    const mapped = (data || []).map((n: any) => ({
+      ...n,
+      action_url: n.data?.action_url || n.action_url,
+      action_text: n.data?.action_text || n.action_text,
+    }));
+
     return {
       success: true,
-      notifications: (data || []) as DBNotification[],
+      notifications: mapped as DBNotification[],
     };
   } catch (err: any) {
     console.error("fetchUserNotificationsAction error:", err);
@@ -80,7 +86,7 @@ export async function createNotificationAction(params: {
       return { success: false, error: "No user ID available for notification" };
     }
 
-    // Map categories to accepted notification types or default to 'system' / 'general'
+    // Map categories to accepted notification types or default to 'system'
     const notificationType = params.type || "system";
 
     const insertPayload: any = {
@@ -89,6 +95,10 @@ export async function createNotificationAction(params: {
       body: params.body,
       type: notificationType,
       is_read: false,
+      data: {
+        action_url: params.actionUrl,
+        action_text: params.actionText,
+      }
     };
 
     const { data, error } = await supabase

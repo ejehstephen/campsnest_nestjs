@@ -24,7 +24,8 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   deleteNotification,
-  requestPushPermission 
+  requestPushPermission,
+  triggerTestDailyReminder
 } from "@/lib/notifications/service";
 
 export default function NotificationsPage() {
@@ -124,16 +125,33 @@ export default function NotificationsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {pushStatus === "default" && (
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {pushStatus === "granted" ? (
+              <span className="px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Push Alerts Active</span>
+              </span>
+            ) : (
               <button
                 onClick={handleEnablePush}
-                className="px-3.5 py-2 rounded-full bg-gradient-to-r from-brand-violet to-brand-magenta hover:brightness-110 text-xs font-bold text-white flex items-center gap-1.5 transition-all shadow-md"
+                className="px-3.5 py-2 rounded-full bg-gradient-to-r from-brand-violet to-brand-magenta hover:brightness-110 text-xs font-bold text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95"
               >
                 <Volume2 className="h-3.5 w-3.5" />
                 <span>Enable Push Alerts</span>
               </button>
             )}
+
+            <button
+              onClick={() => {
+                triggerTestDailyReminder();
+                setNotifications(getStoredNotifications());
+              }}
+              className="px-3.5 py-2 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 text-xs font-bold text-white flex items-center gap-1.5 transition-all hover:border-brand-magenta/40"
+              title="Test daily campus marketplace reminder"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-brand-magenta" />
+              <span>Test Daily Reminder</span>
+            </button>
 
             {unreadCount > 0 && (
               <button

@@ -111,6 +111,11 @@ export default function MarketPage() {
         console.warn("Could not parse saved campus:", e);
       }
 
+      // Check if URL has action=sell from daily reminder push notification
+      if (window.location.search.includes("action=sell")) {
+        setIsSellModalOpen(true);
+      }
+
       const handleCampusChange = (e: any) => {
         if (e.detail) setSelectedCampus(e.detail);
       };

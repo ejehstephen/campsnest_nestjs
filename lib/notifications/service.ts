@@ -21,6 +21,79 @@ export interface AppNotification {
 }
 
 const STORAGE_KEY = "campsnest_notifications";
+const LAST_DAILY_REMINDER_KEY = "campsnest_last_daily_reminder_timestamp";
+const DAILY_REMINDER_INDEX_KEY = "campsnest_daily_reminder_index";
+
+/**
+ * Register Service Worker for true background Web Push Notifications
+ */
+export async function registerPushServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return null;
+  }
+  try {
+    const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    return reg;
+  } catch (err) {
+    console.warn("Service Worker registration notice:", err);
+    return null;
+  }
+}
+
+/**
+ * Trigger native OS / Browser Push Notification via Service Worker or Desktop Notification API
+ */
+export async function showSystemPushNotification(params: {
+  title: string;
+  body: string;
+  url?: string;
+  tag?: string;
+  icon?: string;
+}) {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    return;
+  }
+
+  const title = params.title;
+  const url = params.url || "/notifications";
+  const icon = params.icon || "/campsnest-logo.png";
+  const options: NotificationOptions = {
+    body: params.body,
+    icon: icon,
+    badge: icon,
+    tag: params.tag || "campsnest-alert",
+    data: { url },
+  };
+
+  try {
+    if (Notification.permission === "granted") {
+      // 1. Try Service Worker (required for Android Chrome, iOS Safari, PWA)
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        if (reg && "showNotification" in reg) {
+          await reg.showNotification(title, options);
+          return;
+        }
+      }
+      // 2. Desktop Notification fallback
+      new Notification(title, options);
+    } else if (Notification.permission === "default") {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        if ("serviceWorker" in navigator) {
+          const reg = await navigator.serviceWorker.ready;
+          if (reg && "showNotification" in reg) {
+            await reg.showNotification(title, options);
+            return;
+          }
+        }
+        new Notification(title, options);
+      }
+    }
+  } catch (e) {
+    console.warn("System push notification error:", e);
+  }
+}
 
 /**
  * Get all stored notifications from localStorage with fallback defaults.
@@ -121,30 +194,113 @@ export function dispatchNotification(
       // Trigger a custom event for live reactive updates across tabs/components
       window.dispatchEvent(new CustomEvent("campsnest:notification_received", { detail: newNotif }));
 
-      // Request and display browser push notification if permitted
-      if ("Notification" in window) {
-        if (Notification.permission === "granted") {
-          new Notification(newNotif.title, {
-            body: newNotif.description,
-            icon: "/icon.svg",
-          });
-        } else if (Notification.permission !== "denied") {
-          Notification.requestPermission().then((permission) => {
-            if (permission === "granted") {
-              new Notification(newNotif.title, {
-                body: newNotif.description,
-                icon: "/icon.svg",
-              });
-            }
-          });
-        }
-      }
+      // Trigger true system push notification via Service Worker / Native Notification API
+      showSystemPushNotification({
+        title: newNotif.title,
+        body: newNotif.description,
+        url: newNotif.actionUrl || "/notifications",
+        tag: `notif-${newNotif.category}`
+      });
     } catch (e) {
       console.warn("Failed to persist notification:", e);
     }
   }
 
   return newNotif;
+}
+
+/**
+ * Daily Reminder Messages catalog for campus marketplace engagement
+ */
+const DAILY_REMINDERS = [
+  {
+    type: "sell",
+    title: "📢 Turn Unused Hostel Gear into Cash!",
+    description: "Got textbooks, a fan, kitchenware, or gadgets you don't use? List them on Campus Marketplace in 60 seconds and get cash from students nearby.",
+    actionUrl: "/market?action=sell",
+    actionText: "Post an Item Now"
+  },
+  {
+    type: "buy",
+    title: "🛍️ Fresh Campus Deals Just Dropped!",
+    description: "Check today's verified student laptops, smartphones, and hostel essentials at student-friendly prices. Beat market inflation today!",
+    actionUrl: "/market",
+    actionText: "Browse Student Deals"
+  },
+  {
+    type: "sell",
+    title: "💰 Need Quick Pocket Money This Week?",
+    description: "Declutter your room! Someone in your hostel or department is looking to buy your fairly-used electronics or textbooks.",
+    actionUrl: "/market?action=sell",
+    actionText: "Sell Item in 1 Min"
+  },
+  {
+    type: "buy",
+    title: "⚡ Verified Student Accommodation & Gear",
+    description: "Students are listing affordable hostels, self-contains, and study gadgets today. Take a quick look before they get taken!",
+    actionUrl: "/market",
+    actionText: "Explore Marketplace"
+  }
+];
+
+/**
+ * Checks if 24 hours have passed since the last daily reminder.
+ * If yes, dispatches an authentic push notification & in-app reminder.
+ */
+export function checkAndTriggerDailyMarketplaceReminder(): boolean {
+  if (typeof window === "undefined") return false;
+
+  try {
+    const lastTimestampStr = localStorage.getItem(LAST_DAILY_REMINDER_KEY);
+    const now = Date.now();
+    const TWENTY_HOURS_MS = 20 * 60 * 60 * 1000;
+
+    if (lastTimestampStr) {
+      const lastTime = parseInt(lastTimestampStr, 10);
+      if (now - lastTime < TWENTY_HOURS_MS) {
+        return false; // Already sent today
+      }
+    }
+
+    // Determine which reminder to show next (rotate index)
+    const currentIndex = parseInt(localStorage.getItem(DAILY_REMINDER_INDEX_KEY) || "0", 10);
+    const reminder = DAILY_REMINDERS[currentIndex % DAILY_REMINDERS.length];
+
+    // Dispatch the daily push reminder
+    dispatchNotification({
+      category: "market",
+      title: reminder.title,
+      description: reminder.description,
+      actionUrl: reminder.actionUrl,
+      actionText: reminder.actionText,
+    });
+
+    // Update timestamp and next index
+    localStorage.setItem(LAST_DAILY_REMINDER_KEY, now.toString());
+    localStorage.setItem(DAILY_REMINDER_INDEX_KEY, ((currentIndex + 1) % DAILY_REMINDERS.length).toString());
+
+    return true;
+  } catch (err) {
+    console.warn("Could not check daily reminder:", err);
+    return false;
+  }
+}
+
+/**
+ * Manually trigger a daily reminder for instant testing or user-initiated preview.
+ */
+export function triggerTestDailyReminder(forceType?: "sell" | "buy"): AppNotification {
+  const chosen = forceType 
+    ? DAILY_REMINDERS.find((r) => r.type === forceType) || DAILY_REMINDERS[0]
+    : DAILY_REMINDERS[Math.floor(Math.random() * DAILY_REMINDERS.length)];
+
+  return dispatchNotification({
+    category: "market",
+    title: chosen.title,
+    description: chosen.description,
+    actionUrl: chosen.actionUrl,
+    actionText: chosen.actionText,
+  });
 }
 
 /**
@@ -184,14 +340,25 @@ export async function deleteNotification(id: string) {
 }
 
 /**
- * Request browser push notification permission.
+ * Request browser push notification permission and register service worker.
  */
 export async function requestPushPermission(): Promise<NotificationPermission | "unsupported"> {
   if (typeof window === "undefined" || !("Notification" in window)) {
     return "unsupported";
   }
   try {
-    return await Notification.requestPermission();
+    await registerPushServiceWorker();
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      // Show instant confirmation push notification
+      await showSystemPushNotification({
+        title: "Push Alerts Activated! 🔔",
+        body: "You will now receive instant alerts for roommate waves, inspection passes, and daily campus marketplace deals.",
+        url: "/notifications",
+        tag: "campsnest-activated"
+      });
+    }
+    return permission;
   } catch (e) {
     return "denied";
   }

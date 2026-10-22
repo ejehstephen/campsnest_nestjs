@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { AuthProvider } from "@/lib/auth/auth-provider";
 import { Analytics } from "@vercel/analytics/react";
+import { NotificationManager } from "@/components/layout/notification-manager";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -80,6 +81,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <Analytics />
+          <NotificationManager />
         </AuthProvider>
       </body>
     </html>

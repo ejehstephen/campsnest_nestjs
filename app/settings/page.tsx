@@ -37,6 +37,7 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import { APP_CONFIG, CAMPUS_LIST } from "@/lib/constants";
 import { deleteAccountAction } from "@/lib/auth/actions";
+import { requestPushPermission } from "@/lib/notifications/service";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -188,11 +189,16 @@ export default function SettingsPage() {
     showToast(nextVal ? "Safe Meetup Mode active (Campus safe zones only)" : "Safe Meetup Mode disabled");
   };
 
-  const togglePush = () => {
+  const togglePush = async () => {
     const nextVal = !pushNotifications;
     setPushNotifications(nextVal);
     if (typeof window !== "undefined") localStorage.setItem("campsnest_push_notifications", String(nextVal));
-    showToast(`Push notifications ${nextVal ? "enabled" : "disabled"}`);
+    if (nextVal) {
+      await requestPushPermission();
+      showToast("Push notifications activated 🔔");
+    } else {
+      showToast("Push notifications disabled");
+    }
   };
 
   const toggleEmailAlerts = () => {
