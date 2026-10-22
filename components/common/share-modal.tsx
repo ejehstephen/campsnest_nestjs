@@ -37,9 +37,10 @@ export function ShareModal({
 
   if (!isOpen) return null;
 
-  const currentUrl = url || (typeof window !== "undefined" ? window.location.href : "https://campsnest.com");
-  const formattedPrice = price ? ` for ₦${Number(price).toLocaleString()}` : "";
-  const shareText = `🔥 Check out "${title}"${formattedPrice} on CampsNest Campus Marketplace!\n👉 ${currentUrl}`;
+  const isHousing = (category || "").toLowerCase().includes("hous") || (category || "").toLowerCase().includes("lodge") || (category || "").toLowerCase().includes("room");
+  const platformName = isHousing ? "CampsNest Student Housing" : "CampsNest Campus Marketplace";
+  const formattedPrice = price ? (isHousing ? ` for ₦${Number(price).toLocaleString()}/yr` : ` for ₦${Number(price).toLocaleString()}`) : "";
+  const shareText = `🔥 Check out "${title}"${formattedPrice} on ${platformName}!\n👉 ${currentUrl}`;
 
   const handleCopyLink = async () => {
     try {
@@ -57,12 +58,12 @@ export function ShareModal({
   };
 
   const handleTwitterShare = () => {
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out "${title}" on CampsNest Marketplace!`)}&url=${encodeURIComponent(currentUrl)}`;
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out "${title}" on ${platformName}!`)}&url=${encodeURIComponent(currentUrl)}`;
     window.open(twitterUrl, "_blank");
   };
 
   const handleTelegramShare = () => {
-    const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(currentUrl)}&text=${encodeURIComponent(`Check out "${title}" on CampsNest!`)}`;
+    const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(currentUrl)}&text=${encodeURIComponent(`Check out "${title}" on ${platformName}!`)}`;
     window.open(tgUrl, "_blank");
   };
 

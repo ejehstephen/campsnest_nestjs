@@ -50,23 +50,23 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_NG",
     url: "https://campsnest.com",
-    title: "CampsNest — Student Housing, Campus Market & Roommates",
-    description: "Discover verified student housing, buy & sell campus gear safely, and match with compatible roommates.",
+    title: "CampsNest 2.0 — Your Campus. Your Space. Your People.",
+    description: "The modern student living, marketplace, and social connection superapp for Nigerian Universities. Discover verified housing, buy/sell student gadgets, and match with compatible roommates.",
     siteName: "CampsNest",
     images: [
       {
-        url: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80",
+        url: "https://campsnest.com/campsnest-logo.png",
         width: 1200,
         height: 630,
-        alt: "CampsNest Student Housing and Campus SuperApp",
+        alt: "CampsNest — Campus SuperApp Logo",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "CampsNest — Student Housing & Campus SuperApp",
+    title: "CampsNest 2.0 — Your Campus. Your Space. Your People.",
     description: "Discover verified student housing, buy & sell campus gear safely, and match with compatible roommates.",
-    images: ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80"],
+    images: ["https://campsnest.com/campsnest-logo.png"],
   },
 };
 
