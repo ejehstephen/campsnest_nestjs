@@ -96,14 +96,14 @@ export default function ConnectPage() {
     }
   }, []);
 
-  // Fetch matches from action
+  // Fetch matches from action with dynamic criteria and intent
   React.useEffect(() => {
     async function loadMatches() {
-      const data = await fetchConnectMatchesAction(activeIntent, genderFilter);
+      const data = await fetchConnectMatchesAction(activeIntent, genderFilter, profile?.gender, answers);
       setMatchesList(data);
     }
     loadMatches();
-  }, [activeIntent, genderFilter]);
+  }, [activeIntent, genderFilter, profile?.gender, answers]);
 
   const currentQuestion = CONNECT_QUESTIONS[currentStepIndex];
   const selectedOptionId = answers[currentQuestion?.key] || currentQuestion?.options[0]?.id;
@@ -142,6 +142,11 @@ export default function ConnectPage() {
       }
     }
 
+    // Automatically align intent filter to what the user chose in the questionnaire
+    if (answers.intent && answers.intent !== "both") {
+      setActiveIntent(answers.intent as "dating" | "roommate" | "study");
+    }
+
     try {
       await saveQuestionnaireAnswersAction({
         userId: profile?.id,
@@ -152,7 +157,12 @@ export default function ConnectPage() {
       console.warn("Error syncing answers:", e);
     }
 
-    const data = await fetchConnectMatchesAction(activeIntent, genderFilter);
+    const data = await fetchConnectMatchesAction(
+      (answers.intent && answers.intent !== "both" ? answers.intent : activeIntent),
+      genderFilter,
+      profile?.gender,
+      answers
+    );
     setMatchesList(data);
 
     setTimeout(() => {

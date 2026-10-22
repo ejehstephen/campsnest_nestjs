@@ -51,19 +51,21 @@ export default function MatchResultsPage() {
       try {
         let savedIntent = "both";
         let savedGender = profile?.gender;
+        let savedAnswersObj: Record<string, string> | undefined = undefined;
 
         if (typeof window !== "undefined") {
           const rawAnswers = localStorage.getItem("campsnest_questionnaire_answers");
           if (rawAnswers) {
             try {
               const parsed = JSON.parse(rawAnswers);
+              savedAnswersObj = parsed;
               if (parsed.intent) savedIntent = parsed.intent;
               if (parsed.gender && !savedGender) savedGender = parsed.gender;
             } catch (e) {}
           }
         }
 
-        const list = await fetchConnectMatchesAction(savedIntent, undefined, savedGender);
+        const list = await fetchConnectMatchesAction(savedIntent, undefined, savedGender, savedAnswersObj);
         setCandidates(list);
       } catch (e) {
         console.warn("Could not fetch matches:", e);
