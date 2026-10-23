@@ -155,8 +155,11 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
         const compressedList = await Promise.all(
           files.map((file) => compressMarketImage(file))
         );
-        setImagesList((prev) => [...compressedList, ...prev].slice(0, 6));
-        setImage(compressedList[0]);
+        const valid = compressedList.filter(Boolean);
+        if (valid.length > 0) {
+          setImagesList((prev) => [...valid, ...prev].slice(0, 6));
+          setImage(valid[0]);
+        }
       } catch (err) {
         console.error("Error compressing images:", err);
       }

@@ -48,70 +48,112 @@ export function compressImageFile(
   const maxKbTarget = typeof options === "object" ? options?.maxKbTarget || 45 : 45;
 
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
+    let objectUrl = "";
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch (e) {
+      // Fallback to FileReader if createObjectURL fails
+    }
 
-        // Calculate aspect ratio constraint
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
+    const processImage = (img: HTMLImageElement) => {
+      const canvas = document.createElement("canvas");
+      let width = img.width;
+      let height = img.height;
+
+      // Calculate aspect ratio constraint
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
         }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext("2d", { alpha: false });
-        if (!ctx) {
-          resolve(event.target?.result as string);
-          return;
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
         }
+      }
 
-        // Draw with high quality smoothing
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "medium";
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
+      canvas.width = width;
+      canvas.height = height;
 
-        // Try WebP first for lowest byte size
-        let mimeType = "image/webp";
-        let output = canvas.toDataURL(mimeType, initialQuality);
+      const ctx = canvas.getContext("2d", { alpha: false });
+      if (!ctx) {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.readAsDataURL(file);
+        return;
+      }
 
-        // Fallback to JPEG if browser doesn't export webp
-        if (!output.startsWith("data:image/webp")) {
-          mimeType = "image/jpeg";
-          output = canvas.toDataURL(mimeType, initialQuality);
+      // Draw with high quality smoothing
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "medium";
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Try WebP first for lowest byte size (30-40% smaller than JPEG)
+      let mimeType = "image/webp";
+      let output = canvas.toDataURL(mimeType, initialQuality);
+
+      // Fallback to JPEG if browser doesn't export webp
+      if (!output.startsWith("data:image/webp")) {
+        mimeType = "image/jpeg";
+        output = canvas.toDataURL(mimeType, initialQuality);
+      }
+
+      // Tier 1 Aggressive loop: Step down quality
+      let currentQuality = initialQuality;
+      let approxKb = (output.length * 0.75) / 1024;
+
+      while (approxKb > maxKbTarget && currentQuality > 0.35) {
+        currentQuality -= 0.1;
+        output = canvas.toDataURL(mimeType, currentQuality);
+        approxKb = (output.length * 0.75) / 1024;
+      }
+
+      // Tier 2 Dimension step-down for high-detail photos to strictly adhere to target
+      if (approxKb > maxKbTarget) {
+        const secondary = document.createElement("canvas");
+        secondary.width = Math.round(width * 0.75);
+        secondary.height = Math.round(height * 0.75);
+        const sCtx = secondary.getContext("2d", { alpha: false });
+        if (sCtx) {
+          sCtx.imageSmoothingEnabled = true;
+          sCtx.drawImage(canvas, 0, 0, secondary.width, secondary.height);
+          output = secondary.toDataURL(mimeType, 0.55);
         }
+      }
 
-        // Aggressive loop: If data exceeds maxKbTarget, step down quality
-        let currentQuality = initialQuality;
-        let approxKb = (output.length * 0.75) / 1024;
-
-        while (approxKb > maxKbTarget && currentQuality > 0.35) {
-          currentQuality -= 0.1;
-          output = canvas.toDataURL(mimeType, currentQuality);
-          approxKb = (output.length * 0.75) / 1024;
-        }
-
-        resolve(output);
-      };
-      img.onerror = () => reject(new Error("Failed to load image for compression"));
-      img.src = event.target?.result as string;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      resolve(output);
     };
-    reader.onerror = (err) => reject(err);
-    reader.readAsDataURL(file);
+
+    const img = new Image();
+    img.onload = () => processImage(img);
+    img.onerror = () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      // Fallback using FileReader
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const fallbackImg = new Image();
+        fallbackImg.onload = () => processImage(fallbackImg);
+        fallbackImg.onerror = () => reject(new Error("Failed to load image for compression"));
+        fallbackImg.src = event.target?.result as string;
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    };
+
+    if (objectUrl) {
+      img.src = objectUrl;
+    } else {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        img.src = event.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
   });
 }
 
@@ -196,6 +238,166 @@ export function compressVideoThumbnail(file: File): Promise<string> {
     video.onerror = () => {
       URL.revokeObjectURL(videoUrl);
       reject(new Error("Failed to process video frame"));
+    };
+  });
+}
+
+/**
+ * Aggressively compress or transcode a video tour to ultra-compact size (< 5MB target).
+ * Uses canvas captureStream + MediaRecorder when available to scale down resolution (max 540p)
+ * and target ~750 kbps bitrate. If already small (< 2.5MB) or MediaRecorder is unsupported,
+ * safely falls back without blocking the user.
+ */
+export async function compressVideoFile(
+  file: File,
+  maxDimension = 540,
+  targetBitrate = 750000
+): Promise<string> {
+  // If file is already ultra-lightweight (< 2.5MB), read directly as DataURL
+  if (file.size <= 2.5 * 1024 * 1024) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve(ev.target?.result as string);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // If MediaRecorder or canvas captureStream is unsupported, return direct data URL
+  if (
+    typeof window === "undefined" ||
+    typeof window.MediaRecorder === "undefined" ||
+    !HTMLCanvasElement.prototype.captureStream
+  ) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve(ev.target?.result as string);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    const objectUrl = URL.createObjectURL(file);
+    video.src = objectUrl;
+    video.muted = true;
+    video.playsInline = true;
+
+    // Timeout safety fallback (max 10s transcoding)
+    const timeoutId = setTimeout(() => {
+      cleanup();
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve(ev.target?.result as string);
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    }, 10000);
+
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      try {
+        video.pause();
+        URL.revokeObjectURL(objectUrl);
+      } catch (e) {}
+    };
+
+    video.onloadedmetadata = () => {
+      try {
+        let width = video.videoWidth || 640;
+        let height = video.videoHeight || 360;
+
+        if (width > height) {
+          if (width > maxDimension) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        // Make dimensions even numbers (required by video codecs)
+        width = width % 2 === 0 ? width : width - 1;
+        height = height % 2 === 0 ? height : height - 1;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d", { alpha: false });
+
+        if (!ctx) {
+          cleanup();
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target?.result as string);
+          reader.readAsDataURL(file);
+          return;
+        }
+
+        const stream = canvas.captureStream(24);
+        let mimeType = "video/webm;codecs=vp8";
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "video/mp4";
+        }
+
+        const recorder = new MediaRecorder(stream, {
+          mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : undefined,
+          videoBitsPerSecond: targetBitrate,
+        });
+
+        const chunks: Blob[] = [];
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+
+        recorder.onstop = () => {
+          cleanup();
+          const compressedBlob = new Blob(chunks, { type: mimeType });
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target?.result as string);
+          reader.onerror = () => resolve("");
+          reader.readAsDataURL(compressedBlob);
+        };
+
+        let animFrameId: number;
+        const drawFrame = () => {
+          if (!video.paused && !video.ended) {
+            ctx.drawImage(video, 0, 0, width, height);
+            animFrameId = requestAnimationFrame(drawFrame);
+          }
+        };
+
+        video.onended = () => {
+          cancelAnimationFrame(animFrameId);
+          if (recorder.state === "recording") {
+            recorder.stop();
+          }
+        };
+
+        recorder.start(250);
+        video.playbackRate = 2.0; // 2x faster encoding
+        video.play().then(() => {
+          drawFrame();
+        }).catch(() => {
+          cleanup();
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+      } catch (err) {
+        cleanup();
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target?.result as string);
+        reader.readAsDataURL(file);
+      }
+    };
+
+    video.onerror = () => {
+      cleanup();
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve(ev.target?.result as string);
+      reader.readAsDataURL(file);
     };
   });
 }

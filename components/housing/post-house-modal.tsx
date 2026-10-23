@@ -25,7 +25,7 @@ import {
   Play
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { compressHouseImage, isVideoUrl } from "@/lib/utils";
+import { compressHouseImage, compressVideoFile, isVideoUrl } from "@/lib/utils";
 import { createHousingListingAction } from "@/lib/housing/actions";
 import { HousingItem } from "@/lib/housing/constants";
 import { recordMyCreatedListingId, normalizePhoneNumber } from "@/lib/listing-storage";
@@ -135,18 +135,20 @@ export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: Po
         const processed = await Promise.all(
           files.map(async (file) => {
             if (file.type.startsWith("video/")) {
-              return new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (ev) => resolve(ev.target?.result as string);
-                reader.onerror = (err) => reject(err);
-                reader.readAsDataURL(file);
-              });
+              if (file.size > 25 * 1024 * 1024) {
+                alert(`Video "${file.name}" exceeds 25MB. Please choose a short clip under 20MB for fast mobile loading.`);
+                return null;
+              }
+              return compressVideoFile(file);
             }
             return compressHouseImage(file);
           })
         );
-        setImagesList((prev) => [...processed, ...prev].slice(0, 6));
-        setImage(processed[0]);
+        const valid = processed.filter(Boolean) as string[];
+        if (valid.length > 0) {
+          setImagesList((prev) => [...valid, ...prev].slice(0, 6));
+          setImage(valid[0]);
+        }
       } catch (err) {
         console.error("Error processing house photos & videos:", err);
       }
