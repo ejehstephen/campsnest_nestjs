@@ -38,6 +38,7 @@ import { SellItemModal, PublishedItem } from "@/components/market/sell-item-moda
 import { ShareModal } from "@/components/common/share-modal";
 import { fetchMarketItemsAction, deleteMarketItemAction } from "@/lib/market/actions";
 import { isListingDeleted, recordDeletedListingId, checkIsListingOwner, normalizePhoneNumber } from "@/lib/listing-storage";
+import { getCachedMarketItems, setCachedMarketItems } from "@/lib/listing-cache";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { CAMPUS_LIST } from "@/lib/constants";
 import { MARKET_CATEGORIES, MARKET_PRODUCTS, MarketItem } from "@/lib/market/constants";
@@ -50,7 +51,7 @@ export default function MarketPage() {
   const [activeCategory, setActiveCategory] = React.useState("all");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [savedItems, setSavedItems] = React.useState<string[]>([]);
-  const [products, setProducts] = React.useState<MarketItem[]>([]);
+  const [products, setProducts] = React.useState<MarketItem[]>(() => getCachedMarketItems() || []);
   const [isSellModalOpen, setIsSellModalOpen] = React.useState(false);
   const [shareItem, setShareItem] = React.useState<MarketItem | null>(null);
   const [deleteItemTarget, setDeleteItemTarget] = React.useState<MarketItem | null>(null);
@@ -65,8 +66,12 @@ export default function MarketPage() {
       // 1. Permanently blacklist and purge locally across storage
       recordDeletedListingId(targetId);
 
-      // 2. Remove immediately from React state
-      setProducts((prev) => prev.filter((p) => String(p.id) !== targetId));
+      // 2. Remove immediately from React state and update cache
+      setProducts((prev) => {
+        const next = prev.filter((p) => String(p.id) !== targetId);
+        setCachedMarketItems(next);
+        return next;
+      });
 
       // 3. Mark as deleted in Supabase DB
       await deleteMarketItemAction(targetId);
@@ -158,8 +163,8 @@ export default function MarketPage() {
             school: item.school || "Federal University Wukari",
             location: item.location || "Campus Main Gate",
             postedTime: "Just now",
-            image: item.image || (item.images && item.images[0]) || "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&auto=format&fit=crop&q=80",
-            images: item.images && item.images.length > 0 ? item.images : item.image ? [item.image] : [],
+            image: item.image || (item.images && item.images[0]) || "/campsnest-logo.png",
+            images: item.images && item.images.length > 0 ? item.images : item.image ? [item.image] : ["/campsnest-logo.png"],
             seller_id: item.seller_id,
             seller: {
               id: item.seller_id,
@@ -167,7 +172,7 @@ export default function MarketPage() {
               level: (item as any).seller?.level || item.seller_level || "300 Level",
               avatar: (item as any).seller?.profile_image || (item.seller_avatar && !item.seller_avatar.includes("example.com")
                 ? item.seller_avatar
-                : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"),
+                : ""),
               verified: true,
               whatsapp: normalizePhoneNumber((item as any).seller?.whatsapp_number || (item as any).seller?.phone_number || item.seller_whatsapp) || "2348134351762"
             },
@@ -175,7 +180,9 @@ export default function MarketPage() {
 
         setProducts((prev) => {
           const localOnly = prev.filter(p => !isListingDeleted(p.id) && !formattedDbItems.some(db => String(db.id) === String(p.id)));
-          return [...localOnly, ...formattedDbItems];
+          const combined = [...localOnly, ...formattedDbItems];
+          setCachedMarketItems(combined);
+          return combined;
         });
       }
     };
@@ -185,7 +192,11 @@ export default function MarketPage() {
     const handleListingDeleted = (e: any) => {
       const deletedId = e?.detail?.id;
       if (deletedId) {
-        setProducts((prev) => prev.filter((p) => String(p.id) !== String(deletedId)));
+        setProducts((prev) => {
+          const next = prev.filter((p) => String(p.id) !== String(deletedId));
+          setCachedMarketItems(next);
+          return next;
+        });
       }
     };
 
@@ -200,7 +211,11 @@ export default function MarketPage() {
   };
 
   const handlePublishItem = (newItem: PublishedItem) => {
-    setProducts((prev) => [newItem, ...prev]);
+    setProducts((prev) => {
+      const updated = [newItem, ...prev];
+      setCachedMarketItems(updated);
+      return updated;
+    });
   };
 
   // Filter products by active School & search queries

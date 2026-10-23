@@ -45,6 +45,7 @@ import { ReportModal } from "@/components/common/report-modal";
 import { ShareModal } from "@/components/common/share-modal";
 import { fetchMarketItemByIdAction, fetchMarketItemsAction, deleteMarketItemAction } from "@/lib/market/actions";
 import { isListingDeleted, recordDeletedListingId, checkIsListingOwner, normalizePhoneNumber } from "@/lib/listing-storage";
+import { findCachedMarketItem } from "@/lib/listing-cache";
 import { Avatar } from "@/components/ui/avatar";
 import { MARKET_PRODUCTS, MarketItem } from "@/lib/market/constants";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -59,25 +60,25 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
   const [shareModalOpen, setShareModalOpen] = React.useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [dbItem, setDbItem] = React.useState<any | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-
-  const [relatedDeals, setRelatedDeals] = React.useState<any[]>([]);
-
-  React.useEffect(() => {
-    setMounted(true);
-
-    // 1. Immediately check custom local items
+  
+  // Instant resolution from cache or localStorage to avoid loading flash
+  const initialCached = React.useMemo(() => {
     if (typeof window !== "undefined") {
       try {
         const localItems = JSON.parse(localStorage.getItem("campsnest_custom_market_items") || "[]");
         const match = localItems.find((i: any) => i.id === params.id);
-        if (match) {
-          setDbItem(match);
-          setIsLoading(false);
-        }
+        if (match) return match;
       } catch (e) {}
     }
+    return findCachedMarketItem(params.id);
+  }, [params.id]);
+
+  const [dbItem, setDbItem] = React.useState<any | null>(() => initialCached);
+  const [isLoading, setIsLoading] = React.useState(() => !initialCached);
+  const [relatedDeals, setRelatedDeals] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    setMounted(true);
 
     const loadItem = async () => {
       try {
@@ -99,7 +100,7 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
               location: item.location || "Campus Main Gate",
               price: Number(item.price) || 0,
               sellerLevel: item.seller_level || "Student Seller",
-              image: item.image || (item.images && item.images[0]) || "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=500&auto=format&fit=crop&q=80",
+              image: item.image || (item.images && item.images[0]) || "/campsnest-logo.png",
               description: item.description || "Campus item ready for inspection"
             }));
           setRelatedDeals(others);
@@ -115,23 +116,77 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
 
   // Fallback matching from static market products if DB item is not yet present
   const mockFallback = MARKET_PRODUCTS.find((p) => p.id === params.id);
-  const item = dbItem || mockFallback || {
-    id: params.id,
-    title: "Campus Marketplace Item",
-    description: "Verified student listing in great condition. Available for quick campus inspection and safe handoff.",
-    condition_badge: "MINT CONDITION",
-    condition_color: "bg-[#1E293B]/80 text-emerald-300 border-emerald-500/30",
-    price: 35000,
-    category: "Market",
-    location: "Hostel Block B, Main Campus",
-    is_negotiable: true,
-    seller_name: "Verified Student",
-    seller_level: "300 Level",
-    seller_avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-    seller_whatsapp: "",
-    image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=1200&auto=format&fit=crop&q=80",
-    images: []
-  };
+  const item = dbItem || mockFallback;
+
+  // 1. Sleek Skeleton Loading State (Prevents flashing dummy item or wrong pictures)
+  if (isLoading && !item) {
+    return (
+      <AppShell>
+        <div className="space-y-6 pb-24 max-w-7xl mx-auto">
+          <div className="flex items-center justify-between gap-2 text-xs py-1">
+            <Link
+              href="/market"
+              className="flex items-center gap-1.5 text-xs font-bold text-white shrink-0 bg-white/[0.06] hover:bg-white/[0.12] px-3 py-1.5 rounded-full border border-white/10"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Back</span>
+            </Link>
+            <div className="h-7 w-28 rounded-full bg-white/[0.05] border border-white/10 animate-pulse" />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="lg:col-span-8 space-y-4">
+              <div className="relative h-[360px] sm:h-[460px] w-full rounded-3xl bg-white/[0.04] border border-white/10 animate-pulse flex flex-col items-center justify-center gap-3">
+                <ShoppingBag className="h-12 w-12 text-white/20 animate-pulse" />
+                <span className="text-xs text-white/30 font-medium">Loading item details...</span>
+              </div>
+              <div className="flex gap-2">
+                <div className="h-16 w-16 rounded-xl bg-white/[0.04] border border-white/10 animate-pulse" />
+                <div className="h-16 w-16 rounded-xl bg-white/[0.04] border border-white/10 animate-pulse" />
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 space-y-4">
+              <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 space-y-4 animate-pulse">
+                <div className="h-4 w-20 rounded-full bg-white/10" />
+                <div className="h-8 w-4/5 rounded-xl bg-white/10" />
+                <div className="h-10 w-1/2 rounded-xl bg-brand-violet/20" />
+                <div className="h-px bg-white/10 my-4" />
+                <div className="h-20 rounded-2xl bg-white/[0.05]" />
+                <div className="h-12 rounded-2xl bg-emerald-500/20" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // 2. Clean 404 / Item Not Found State
+  if (!isLoading && !item) {
+    return (
+      <AppShell>
+        <div className="max-w-xl mx-auto py-24 px-4 text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center mx-auto text-white/40">
+            <ShoppingBag className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-white">Item Not Found</h2>
+            <p className="text-sm text-text-dim">
+              This marketplace item may have been sold or removed by the seller.
+            </p>
+          </div>
+          <Link
+            href="/market"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-brand-violet hover:bg-brand-violet-light text-white font-semibold transition-all shadow-glow-violet"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Marketplace</span>
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
 
   // Extract raw images cleanly
   const rawImages: string[] = item.images && item.images.length > 0
@@ -139,7 +194,7 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
     : item.image
     ? [item.image]
     : [
-        "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=1200&auto=format&fit=crop&q=80"
+        "/campsnest-logo.png"
       ];
 
   const galleryImages = rawImages.map((url, idx) => ({
@@ -162,7 +217,7 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
   const sellerLevel = sellerUser?.level || item.seller_level || item.seller?.level || "Campus Resident";
   const sellerAvatar = (sellerUser?.profile_image || item.seller_avatar || item.seller?.avatar) && !item.seller_avatar?.includes("example.com")
     ? (sellerUser?.profile_image || item.seller_avatar || item.seller?.avatar)
-    : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80";
+    : "";
   const rawSellerPhone = sellerUser?.whatsapp_number || sellerUser?.phone_number || item.seller_whatsapp || item.seller?.whatsapp || "";
   const sellerWhatsapp = normalizePhoneNumber(rawSellerPhone);
 

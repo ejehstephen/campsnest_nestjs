@@ -62,7 +62,7 @@ export async function fetchUserAllListingsAction(userId?: string): Promise<Profi
             price: m.price || 0,
             status: m.status === "sold" ? "Sold Out" : "Active",
             inquiries: Math.floor(Math.random() * 8) + 2,
-            image: m.image || (m.images && m.images[0]) || "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&auto=format&fit=crop&q=80",
+            image: m.image || (m.images && m.images[0]) || "/campsnest-logo.png",
             createdAt: m.created_at,
             archived: m.status === "sold"
           });

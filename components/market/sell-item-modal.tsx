@@ -98,15 +98,6 @@ const CONDITIONS = [
   }
 ];
 
-const SAMPLE_PHOTOS = [
-  "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1580481077197-28e67fef2954?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=600&auto=format&fit=crop&q=80"
-];
-
 const CAMPUS_LOCATIONS = [
   "Hostel Block B, Main Campus",
   "Hostel Block D, Room 14",
@@ -127,8 +118,8 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
   // Form State
   const [title, setTitle] = React.useState("");
   const [category, setCategory] = React.useState("electronics");
-  const [image, setImage] = React.useState(SAMPLE_PHOTOS[0]);
-  const [imagesList, setImagesList] = React.useState<string[]>([SAMPLE_PHOTOS[0]]);
+  const [image, setImage] = React.useState<string>("");
+  const [imagesList, setImagesList] = React.useState<string[]>([]);
   const [price, setPrice] = React.useState<string>("35000");
   const [originalPrice, setOriginalPrice] = React.useState<string>("45000");
   const [isNegotiable, setIsNegotiable] = React.useState(true);
@@ -183,6 +174,10 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
     e.preventDefault();
     if (step === 1) {
       if (!title.trim()) return;
+      if (!image && imagesList.length === 0) {
+        alert("Please upload at least one photo of your item from your device.");
+        return;
+      }
       setStep(2);
     } else if (step === 2) {
       if (!price || numericPrice <= 0) return;
@@ -197,9 +192,9 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
 
     const sellerAvatar = profile?.profile_image && !profile.profile_image.includes("example.com") && profile.profile_image.trim() !== ""
       ? profile.profile_image
-      : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80";
+      : "/campsnest-logo.png";
 
-    const coverPhoto = image || imagesList[0] || SAMPLE_PHOTOS[0];
+    const coverPhoto = image || imagesList[0] || "/campsnest-logo.png";
     const finalImages = imagesList.length > 0 ? imagesList : [coverPhoto];
     const finalSchool = currentCampus || profile?.school || "Federal University Wukari";
 
@@ -422,31 +417,45 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
                 </div>
 
                 {/* Primary Preview Card */}
-                <div className="relative h-44 sm:h-48 w-full rounded-2xl overflow-hidden border border-white/15 bg-[#100C22] group shadow-inner">
-                  <img
-                    src={image || imagesList[0] || SAMPLE_PHOTOS[0]}
-                    alt="Selected Product"
-                    className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent flex items-end justify-between p-3.5">
-                    <div className="space-y-0.5">
-                      <span className="text-[11px] font-bold text-white flex items-center gap-1.5">
-                        <Camera className="h-3.5 w-3.5 text-brand-magenta-light" />
-                        <span>Cover / Main Display Photo</span>
-                      </span>
-                      <p className="text-[10px] text-white/70">
-                        This is the first photo buyers see in the feed
-                      </p>
+                {image || imagesList[0] ? (
+                  <div className="relative h-44 sm:h-48 w-full rounded-2xl overflow-hidden border border-white/15 bg-[#100C22] group shadow-inner">
+                    <img
+                      src={image || imagesList[0]}
+                      alt="Selected Product"
+                      className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent flex items-end justify-between p-3.5">
+                      <div className="space-y-0.5">
+                        <span className="text-[11px] font-bold text-white flex items-center gap-1.5">
+                          <Camera className="h-3.5 w-3.5 text-brand-magenta-light" />
+                          <span>Cover / Main Display Photo</span>
+                        </span>
+                        <p className="text-[10px] text-white/70">
+                          This is the first photo buyers see in the feed
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-[10px] font-extrabold px-3 py-1.5 rounded-full bg-brand-violet hover:bg-brand-violet-light text-white shadow-lg transition-all"
+                      >
+                        + Add Photos
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="text-[10px] font-extrabold px-3 py-1.5 rounded-full bg-brand-violet hover:bg-brand-violet-light text-white shadow-lg transition-all"
-                    >
-                      + Add Photos
-                    </button>
                   </div>
-                </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="relative h-44 sm:h-48 w-full rounded-2xl overflow-hidden border-2 border-dashed border-brand-magenta/60 hover:border-brand-magenta bg-brand-magenta/[0.04] hover:bg-brand-magenta/[0.08] flex flex-col items-center justify-center cursor-pointer transition-all p-4 text-center group"
+                  >
+                    <div className="h-12 w-12 rounded-2xl bg-brand-magenta/15 border border-brand-magenta/30 flex items-center justify-center text-brand-magenta-light mb-2 group-hover:scale-110 transition-transform">
+                      <Upload className="h-6 w-6" />
+                    </div>
+                    <span className="text-xs font-bold text-white">Upload Photos from Device</span>
+                    <span className="text-[10px] text-brand-magenta font-semibold mt-0.5">* Product photo required</span>
+                    <p className="text-[10px] text-text-dim mt-1">Tap here to choose up to 6 pictures from your device gallery or camera</p>
+                  </div>
+                )}
 
                 {/* 4-Slot Dedicated Photo Grid */}
                 <div className="space-y-1.5">
@@ -492,7 +501,7 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
                                 const updated = imagesList.filter((_, i) => i !== slotIdx);
                                 setImagesList(updated);
                                 if (image === photo) {
-                                  setImage(updated[0] || SAMPLE_PHOTOS[0]);
+                                  setImage(updated[0] || "");
                                 }
                               }}
                               className="absolute top-1 right-1 h-5 w-5 rounded-full bg-rose-600/90 hover:bg-rose-500 text-white flex items-center justify-center shadow transition-all opacity-90 hover:opacity-100"
@@ -539,41 +548,6 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
                   </div>
                 </div>
 
-                {/* Quick Presets Row */}
-                <div className="space-y-1 pt-1">
-                  <div className="flex items-center justify-between text-[10px] text-text-dim">
-                    <span className="uppercase font-bold tracking-wider">
-                      Or Pick Fast Campus Presets:
-                    </span>
-                    <span className="text-[9px]">Tap to add to your photos</span>
-                  </div>
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                    {SAMPLE_PHOTOS.map((photoUrl, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          if (!imagesList.includes(photoUrl)) {
-                            setImagesList((prev) => [...prev, photoUrl].slice(0, 6));
-                          }
-                          setImage(photoUrl);
-                        }}
-                        className={`relative h-12 w-12 rounded-xl overflow-hidden border shrink-0 transition-all ${
-                          imagesList.includes(photoUrl)
-                            ? "border-brand-magenta scale-105 shadow-glow-magenta/40"
-                            : "border-white/20 opacity-60 hover:opacity-100"
-                        }`}
-                      >
-                        <img src={photoUrl} alt="Preset" className="h-full w-full object-cover" />
-                        {imagesList.includes(photoUrl) && (
-                          <div className="absolute inset-0 bg-brand-violet/40 flex items-center justify-center">
-                            <Check className="h-3.5 w-3.5 text-white stroke-[3]" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
 
             </form>
@@ -774,7 +748,7 @@ export function SellItemModal({ isOpen, onClose, onPublish, currentCampus }: Sel
                 <div className="p-3.5 rounded-2xl bg-[#181332] border border-brand-violet/30 shadow-xl space-y-3 max-w-sm mx-auto">
                   <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-[#100C22]">
                     <img 
-                      src={image || imagesList[0] || SAMPLE_PHOTOS[0]} 
+                      src={image || imagesList[0] || "/campsnest-logo.png"} 
                       alt="Preview" 
                       className="h-full w-full object-cover" 
                     />

@@ -48,6 +48,7 @@ import { isVideoUrl, parseUserName } from "@/lib/utils";
 import { ShareModal } from "@/components/common/share-modal";
 import { fetchHousingListingsAction, deleteHousingListingAction } from "@/lib/housing/actions";
 import { isListingDeleted, recordDeletedListingId, checkIsListingOwner, normalizePhoneNumber } from "@/lib/listing-storage";
+import { getCachedHousingListings, setCachedHousingListings } from "@/lib/listing-cache";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { CAMPUS_LIST } from "@/lib/constants";
 import { 
@@ -81,7 +82,7 @@ export default function HousingDiscoveryPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [maxBudget, setMaxBudget] = React.useState<number>(350000);
   const [savedNests, setSavedNests] = React.useState<string[]>([]);
-  const [housingListings, setHousingListings] = React.useState<HousingItem[]>([]);
+  const [housingListings, setHousingListings] = React.useState<HousingItem[]>(() => getCachedHousingListings() || []);
   const [isPostModalOpen, setIsPostModalOpen] = React.useState(false);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = React.useState(false);
   const [shareHouse, setShareHouse] = React.useState<HousingItem | null>(null);
@@ -97,8 +98,12 @@ export default function HousingDiscoveryPage() {
       // 1. Permanently blacklist and purge locally across storage
       recordDeletedListingId(targetId);
 
-      // 2. Remove immediately from React state
-      setHousingListings((prev) => prev.filter((h) => String(h.id) !== targetId));
+      // 2. Remove immediately from React state and cache
+      setHousingListings((prev) => {
+        const next = prev.filter((h) => String(h.id) !== targetId);
+        setCachedHousingListings(next);
+        return next;
+      });
 
       // 3. Mark as inactive and delete in Supabase DB
       await deleteHousingListingAction(targetId);
@@ -249,7 +254,9 @@ export default function HousingDiscoveryPage() {
 
           setHousingListings((prev) => {
             const localOnly = prev.filter(p => !isListingDeleted(p.id) && !formattedDbHouses.some(db => String(db.id) === String(p.id)));
-            return [...localOnly, ...formattedDbHouses];
+            const combined = [...localOnly, ...formattedDbHouses];
+            setCachedHousingListings(combined);
+            return combined;
           });
         }
       } catch (err) {
@@ -262,7 +269,11 @@ export default function HousingDiscoveryPage() {
     const handleListingDeleted = (e: any) => {
       const deletedId = e?.detail?.id;
       if (deletedId) {
-        setHousingListings((prev) => prev.filter((h) => String(h.id) !== String(deletedId)));
+        setHousingListings((prev) => {
+          const next = prev.filter((h) => String(h.id) !== String(deletedId));
+          setCachedHousingListings(next);
+          return next;
+        });
       }
     };
 
@@ -277,7 +288,11 @@ export default function HousingDiscoveryPage() {
   };
 
   const handlePublishHouse = (newHouse: PublishedHouse) => {
-    setHousingListings((prev) => [newHouse, ...prev.filter(h => h.id !== newHouse.id)]);
+    setHousingListings((prev) => {
+      const updated = [newHouse, ...prev.filter(h => h.id !== newHouse.id)];
+      setCachedHousingListings(updated);
+      return updated;
+    });
   };
 
   // Filter listings by active School & search queries

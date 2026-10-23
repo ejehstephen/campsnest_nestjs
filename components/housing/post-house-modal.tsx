@@ -103,8 +103,8 @@ export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: Po
   const [genderPref, setGenderPref] = React.useState("any");
   
   // Photos State
-  const [image, setImage] = React.useState(SAMPLE_HOUSE_PHOTOS[0]);
-  const [imagesList, setImagesList] = React.useState<string[]>([SAMPLE_HOUSE_PHOTOS[0]]);
+  const [image, setImage] = React.useState("");
+  const [imagesList, setImagesList] = React.useState<string[]>([]);
   const [selectedAmenities, setSelectedAmenities] = React.useState<string[]>(["water", "prepaid", "security"]);
   const [whatsappPhone, setWhatsappPhone] = React.useState(profile?.whatsapp_number || profile?.phone_number || "");
   const [isPublishing, setIsPublishing] = React.useState(false);
@@ -194,8 +194,8 @@ export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: Po
       priceUnit: "/ year",
       distance: distance.trim(),
       photoCount: imagesList.length,
-      image: image || imagesList[0] || SAMPLE_HOUSE_PHOTOS[0],
-      images: imagesList.length > 0 ? imagesList : [SAMPLE_HOUSE_PHOTOS[0]],
+      image: image || imagesList[0] || "/campsnest-logo.png",
+      images: imagesList.length > 0 ? imagesList : ["/campsnest-logo.png"],
       description: description.trim() || "Student accommodation within safe campus walking distance with reliable facilities.",
       features: selectedAmenities.map((aId) => {
         const option = AMENITIES_OPTIONS.find((opt) => opt.id === aId);
@@ -450,7 +450,7 @@ export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: Po
                               e.stopPropagation();
                               const updated = imagesList.filter((_, i) => i !== slotIdx);
                               setImagesList(updated);
-                              if (image === photo) setImage(updated[0] || SAMPLE_HOUSE_PHOTOS[0]);
+                              if (image === photo) setImage(updated[0] || "");
                             }}
                             className="absolute top-1 right-1 h-5 w-5 rounded-full bg-rose-600/90 text-white flex items-center justify-center shadow"
                           >
@@ -477,39 +477,6 @@ export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: Po
                       </button>
                     );
                   })}
-                </div>
-
-                {/* Presets */}
-                <div className="space-y-1 pt-1">
-                  <span className="text-[10px] text-text-dim uppercase font-bold tracking-wider block">
-                    Or Pick Sample Photos:
-                  </span>
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                    {SAMPLE_HOUSE_PHOTOS.map((photoUrl, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          if (!imagesList.includes(photoUrl)) {
-                            setImagesList((prev) => [...prev, photoUrl].slice(0, 6));
-                          }
-                          setImage(photoUrl);
-                        }}
-                        className={`relative h-12 w-12 rounded-xl overflow-hidden border shrink-0 transition-all ${
-                          imagesList.includes(photoUrl)
-                            ? "border-brand-magenta scale-105 shadow-glow-magenta/40"
-                            : "border-white/20 opacity-60 hover:opacity-100"
-                        }`}
-                      >
-                        <img src={photoUrl} alt="Preset" className="h-full w-full object-cover" />
-                        {imagesList.includes(photoUrl) && (
-                          <div className="absolute inset-0 bg-brand-violet/40 flex items-center justify-center">
-                            <Check className="h-3.5 w-3.5 text-white stroke-[3]" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
 
@@ -673,7 +640,7 @@ export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: Po
               {/* Live Preview Card */}
               <div className="p-3.5 rounded-2xl bg-[#181332] border border-brand-violet/30 shadow-xl space-y-2.5 max-w-sm mx-auto">
                 <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-[#100C22]">
-                  <img src={image || imagesList[0]} alt="Preview" className="h-full w-full object-cover" />
+                  <img src={image || imagesList[0] || "/campsnest-logo.png"} alt="Preview" className="h-full w-full object-cover" />
                   <div className="absolute top-2 left-2 px-2 py-0.5 rounded text-[8px] font-extrabold uppercase bg-brand-violet/80 border border-white/20">
                     Verified & Ready
                   </div>

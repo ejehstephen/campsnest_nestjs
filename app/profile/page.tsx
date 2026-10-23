@@ -149,7 +149,7 @@ export default function ProfilePage() {
           price: m.price,
           status: "Active",
           inquiries: 6,
-          image: m.image || (m.images && m.images[0]) || "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&auto=format&fit=crop&q=80"
+          image: m.image || (m.images && m.images[0]) || "/campsnest-logo.png"
         }));
 
       const formattedLocalHousing: ProfileListingItem[] = localHousingItems

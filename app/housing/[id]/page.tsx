@@ -44,6 +44,7 @@ import { ReportModal } from "@/components/common/report-modal";
 import { ShareModal } from "@/components/common/share-modal";
 import { fetchHousingListingByIdAction, bookInspectionAction, deleteHousingListingAction } from "@/lib/housing/actions";
 import { isListingDeleted, recordDeletedListingId, checkIsListingOwner, normalizePhoneNumber } from "@/lib/listing-storage";
+import { findCachedHousingListing } from "@/lib/listing-cache";
 import { HOUSING_LISTINGS, HousingItem } from "@/lib/housing/constants";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { parseUserName } from "@/lib/utils";
@@ -60,7 +61,21 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
   const [shareModalOpen, setShareModalOpen] = React.useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [dbHouse, setDbHouse] = React.useState<any | null>(null);
+
+  // Instant resolution from cache or localStorage to avoid loading flash
+  const initialCached = React.useMemo(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const localLodges = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
+        const match = localLodges.find((l: any) => l.id === params.id);
+        if (match) return match;
+      } catch (e) {}
+    }
+    return findCachedHousingListing(params.id);
+  }, [params.id]);
+
+  const [dbHouse, setDbHouse] = React.useState<any | null>(() => initialCached);
+  const [isLoading, setIsLoading] = React.useState(() => !initialCached);
 
   // Inspection Form State
   const [inspectionDate, setInspectionDate] = React.useState("");
@@ -71,20 +86,8 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
 
   React.useEffect(() => {
     setMounted(true);
-    // 1. First check localStorage for immediate instant rendering of custom posted lodges
-    if (typeof window !== "undefined") {
-      try {
-        const localLodges = JSON.parse(localStorage.getItem("campsnest_custom_lodges") || "[]");
-        const match = localLodges.find((l: any) => l.id === params.id);
-        if (match) {
-          setDbHouse(match);
-        }
-      } catch (e) {
-        console.warn("Could not read local lodges:", e);
-      }
-    }
 
-    // 2. Fetch live from Supabase database
+    // Fetch live from Supabase database
     const loadHouse = async () => {
       try {
         const res = await fetchHousingListingByIdAction(params.id);
@@ -93,6 +96,8 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
         }
       } catch (err) {
         console.warn("Could not fetch DB house:", err);
+      } finally {
+        setIsLoading(false);
       }
     };
     loadHouse();
@@ -100,39 +105,77 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
 
   // Fallback to mock item if not in DB or local cache
   const fallbackHouse = HOUSING_LISTINGS.find((h) => h.id === params.id);
-  const house = dbHouse || fallbackHouse || {
-    id: params.id,
-    title: "Campus Student Accommodation",
-    category: "Self Contain",
-    categoryBadge: "Self Contain",
-    statusBadge: "Verified & Ready",
-    statusBadgeColor: "bg-[#3B82F6]/30 text-[#ADC6FF] border-[#3B82F6]/40",
-    address: "Greenfield Estate, Opp. Old Library Annex, Wukari",
-    price: 240000,
-    priceUnit: "/ year",
-    distance: "6 mins to Gate",
-    photoCount: 4,
-    image: "/campsnest-logo.png",
-    images: [
-      "/campsnest-logo.png"
-    ],
-    description: "Fully tiled executive student accommodation with constant borehole water, dedicated prepaid meter, perimeter electric fence, and solar inverter backup.",
-    features: [
-      { label: "24/7 Water", icon: Droplets },
-      { label: "Prepaid", icon: Zap },
-      { label: "Gated Sec", icon: Shield },
-      { label: "Fenced", icon: Building2 }
-    ],
-    host: {
-      initials: "KA",
-      name: "Kelechi A.",
-      role: "Student Verified Host (Level 400)",
-      badge: "No Agent Fee",
-      badgeColor: "bg-brand-magenta/20 text-brand-magenta-light border-brand-magenta/30",
-      whatsapp: "2348123456789",
-      phone: "08123456789"
-    }
-  };
+  const house = dbHouse || fallbackHouse;
+
+  // 1. Sleek Skeleton Loading State (Prevents flashing dummy lodge or wrong pictures)
+  if (isLoading && !house) {
+    return (
+      <AppShell>
+        <div className="space-y-6 pb-24 max-w-7xl mx-auto">
+          <div className="flex items-center justify-between gap-2 text-xs py-1">
+            <Link
+              href="/housing"
+              className="flex items-center gap-1.5 text-xs font-bold text-white shrink-0 bg-white/[0.06] hover:bg-white/[0.12] px-3 py-1.5 rounded-full border border-white/10"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Back</span>
+            </Link>
+            <div className="h-7 w-28 rounded-full bg-white/[0.05] border border-white/10 animate-pulse" />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="lg:col-span-8 space-y-4">
+              <div className="relative h-[360px] sm:h-[460px] w-full rounded-3xl bg-white/[0.04] border border-white/10 animate-pulse flex flex-col items-center justify-center gap-3">
+                <Building2 className="h-12 w-12 text-white/20 animate-pulse" />
+                <span className="text-xs text-white/30 font-medium">Loading accommodation details...</span>
+              </div>
+              <div className="flex gap-2">
+                <div className="h-16 w-16 rounded-xl bg-white/[0.04] border border-white/10 animate-pulse" />
+                <div className="h-16 w-16 rounded-xl bg-white/[0.04] border border-white/10 animate-pulse" />
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 space-y-4">
+              <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 space-y-4 animate-pulse">
+                <div className="h-4 w-20 rounded-full bg-white/10" />
+                <div className="h-8 w-4/5 rounded-xl bg-white/10" />
+                <div className="h-10 w-1/2 rounded-xl bg-brand-violet/20" />
+                <div className="h-px bg-white/10 my-4" />
+                <div className="h-20 rounded-2xl bg-white/[0.05]" />
+                <div className="h-12 rounded-2xl bg-brand-magenta/20" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // 2. Clean 404 / Lodge Not Found State
+  if (!isLoading && !house) {
+    return (
+      <AppShell>
+        <div className="max-w-xl mx-auto py-24 px-4 text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center mx-auto text-white/40">
+            <Building2 className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-white">Lodge Not Found</h2>
+            <p className="text-sm text-text-dim">
+              This student accommodation listing is no longer available or has been unlisted.
+            </p>
+          </div>
+          <Link
+            href="/housing"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-brand-violet hover:bg-brand-violet-light text-white font-semibold transition-all shadow-glow-violet"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Housing</span>
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
 
   const dbImages = (house.room_listing_images || []).map((r: any) => r.images || r.image).filter(Boolean);
   const rawImages: string[] = house.images && house.images.length > 0
