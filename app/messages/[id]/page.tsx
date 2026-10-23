@@ -32,12 +32,12 @@ import {
   sendMessageAction, 
   fetchConversationMessagesAction,
   fetchListingDetailsAction,
-  fetchConversationThreadAction
+  fetchConversationThreadAction,
+  markConversationAsReadAction
 } from "@/lib/messages/actions";
 import { createClient } from "@/lib/supabase/client";
-import { isVideoUrl, sanitizeUUID } from "@/lib/utils";
+import { isVideoUrl, sanitizeUUID, getDeterministicConversationId } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/auth-provider";
-
 
 interface Message {
   id: string;
@@ -48,6 +48,9 @@ interface Message {
   image?: string;
 }
 
+// In-memory module cache for instant (0ms) chat thread rendering
+const globalChatMessagesCache = new Map<string, Message[]>();
+
 function ChatThreadContent() {
   const { profile, user } = useAuth();
   const currentUserId = profile?.id || user?.id;
@@ -55,10 +58,11 @@ function ChatThreadContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const rawId = typeof params?.id === "string" ? params.id : "1";
-  const cleanId = sanitizeUUID(rawId);
 
   // Query parameters
   const queryContext = searchParams.get("context") as "market" | "housing" | "connect" | null;
+  const queryRecipientId = searchParams.get("recipientId") || searchParams.get("sellerId") || searchParams.get("hostId") || (rawId.startsWith("c-") ? rawId.replace("c-", "") : "");
+  const queryContextId = searchParams.get("id") || (rawId.startsWith("m-") || rawId.startsWith("h-") ? rawId.replace(/^[mh]-/, "") : "");
   const queryName = searchParams.get("name");
   const queryTitle = searchParams.get("title");
   const queryPrice = searchParams.get("price");
@@ -66,38 +70,56 @@ function ChatThreadContent() {
   const queryRole = searchParams.get("role");
   const queryAvatar = searchParams.get("avatar");
 
-  const matchCandidate = INITIAL_MATCH_PROFILES.find((m) => m.id === rawId || `c-${m.id}` === rawId);
-
   const [liveListing, setLiveListing] = React.useState<{
     title?: string;
     price?: number;
     sellerOrHostName?: string;
     sellerAvatar?: string;
+    sellerOrHostId?: string;
     imageUrl?: string;
     isVideo?: boolean;
   }>({});
   const [imgError, setImgError] = React.useState(false);
 
-  // Fetch real listing details from Supabase if an ID is present
-  React.useEffect(() => {
-    if (rawId.startsWith("h-") || rawId.startsWith("m-") || queryContext === "housing" || queryContext === "market") {
-      const type = (rawId.startsWith("h-") || queryContext === "housing") ? "housing" : "market";
-      fetchListingDetailsAction(cleanId, type).then((res) => {
-        if (res.title || res.imageUrl || res.sellerOrHostName) {
-          setLiveListing(res);
-        }
-      });
-    }
-  }, [cleanId, rawId, queryContext]);
-
   const [dbThread, setDbThread] = React.useState<{
     id: string;
     title: string;
     type: "market" | "housing" | "connect";
+    participantId?: string;
     participantName: string;
     participantRole: string;
     participantAvatar: string;
   } | null>(null);
+
+  const effectiveRecipientId = queryRecipientId || liveListing.sellerOrHostId || dbThread?.participantId || "";
+
+  // Private 1-on-1 deterministic conversation UUID between these two distinct users
+  const cleanId = React.useMemo(() => {
+    if (
+      (rawId.startsWith("h-") || rawId.startsWith("m-") || rawId.startsWith("c-")) &&
+      currentUserId &&
+      effectiveRecipientId &&
+      effectiveRecipientId !== currentUserId
+    ) {
+      return getDeterministicConversationId(currentUserId, effectiveRecipientId, queryContextId);
+    }
+    return sanitizeUUID(rawId);
+  }, [rawId, currentUserId, effectiveRecipientId, queryContextId]);
+
+  const matchCandidate = INITIAL_MATCH_PROFILES.find((m) => m.id === rawId || `c-${m.id}` === rawId);
+
+  // Fetch real listing details from Supabase if an ID is present
+  React.useEffect(() => {
+    const listingOrItemId = queryContextId || (rawId.startsWith("m-") || rawId.startsWith("h-") ? rawId.replace(/^[mh]-/, "") : "");
+    if (listingOrItemId) {
+      const type = (rawId.startsWith("h-") || queryContext === "housing") ? "housing" : "market";
+      fetchListingDetailsAction(listingOrItemId, type).then((res) => {
+        if (res.title || res.imageUrl || res.sellerOrHostName || res.sellerOrHostId) {
+          setLiveListing(res);
+        }
+      });
+    }
+  }, [rawId, queryContext, queryContextId]);
 
   // Fetch thread details from Supabase if opening directly by UUID
   React.useEffect(() => {
@@ -242,9 +264,6 @@ function ChatThreadContent() {
     };
   }, [cleanId, rawId, matchCandidate, queryContext, queryName, queryTitle, queryPrice, queryImage, queryRole, queryAvatar, liveListing, dbThread]);
 
-// In-memory module cache for instant (0ms) chat thread rendering
-const globalChatMessagesCache = new Map<string, Message[]>();
-
   const [messages, setMessages] = React.useState<Message[]>(
     () => globalChatMessagesCache.get(cleanId) || []
   );
@@ -255,7 +274,7 @@ const globalChatMessagesCache = new Map<string, Message[]>();
   );
   const chatBottomRef = React.useRef<HTMLDivElement>(null);
 
-  // Load real messages from Supabase database in the background
+  // Load real messages from Supabase database in the background and establish realtime sync
   React.useEffect(() => {
     let isMounted = true;
 
@@ -267,7 +286,7 @@ const globalChatMessagesCache = new Map<string, Message[]>();
       try {
         const res = await fetchConversationMessagesAction(cleanId);
         if (res.success && res.messages && res.messages.length > 0) {
-          const mapped = res.messages.map((m) => {
+          const mapped: Message[] = res.messages.map((m) => {
             const isMe = currentUserId ? m.sender_id === currentUserId : false;
             return {
               id: m.id,
@@ -282,6 +301,11 @@ const globalChatMessagesCache = new Map<string, Message[]>();
           globalChatMessagesCache.set(cleanId, mapped);
           if (isMounted) {
             setMessages(mapped);
+          }
+
+          // Mark unread messages in this conversation as read since user is actively viewing it now
+          if (currentUserId) {
+            markConversationAsReadAction(cleanId, currentUserId).catch(() => {});
           }
         } else if (isMounted && !globalChatMessagesCache.has(cleanId)) {
           setMessages([]);
@@ -299,14 +323,11 @@ const globalChatMessagesCache = new Map<string, Message[]>();
 
     loadMessages();
 
-    return () => {
-      isMounted = false;
-    };
-
-    // Setup Supabase real-time listener for incoming messages
+    // Setup Supabase real-time listener for incoming messages and read receipts
+    let channel: any = null;
     try {
       const supabase = createClient();
-      const channel = supabase
+      channel = supabase
         .channel(`messages:${cleanId}`)
         .on(
           "postgres_changes",
@@ -318,43 +339,80 @@ const globalChatMessagesCache = new Map<string, Message[]>();
           },
           (payload: any) => {
             const newMsg = payload.new;
-            if (newMsg) {
+            if (newMsg && isMounted) {
               setMessages((prev) => {
                 // Avoid duplicating optimistic messages
                 if (prev.some((m) => m.id === newMsg.id || (m.text === newMsg.text && Math.abs(Date.now() - new Date(newMsg.created_at).getTime()) < 3000))) {
                   return prev;
                 }
                 const isMe = currentUserId ? newMsg.sender_id === currentUserId : false;
-                return [
-                  ...prev,
-                  {
-                    id: newMsg.id,
-                    sender: isMe ? "me" : "them",
-                    text: newMsg.text,
-                    time: new Date(newMsg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                    status: newMsg.is_read ? "read" : "sent",
-                    image: newMsg.image_url || undefined,
-                  },
-                ];
+
+                // If message is from other user and chat is currently open, mark as read immediately
+                if (!isMe && currentUserId) {
+                  markConversationAsReadAction(cleanId, currentUserId).catch(() => {});
+                }
+
+                const mappedMsg: Message = {
+                  id: newMsg.id,
+                  sender: isMe ? "me" : "them",
+                  text: newMsg.text,
+                  time: new Date(newMsg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                  status: newMsg.is_read ? "read" : "sent",
+                  image: newMsg.image_url || undefined,
+                };
+
+                const next = [...prev, mappedMsg];
+                globalChatMessagesCache.set(cleanId, next);
+                return next;
+              });
+            }
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "messages",
+            filter: `conversation_id=eq.${cleanId}`,
+          },
+          (payload: any) => {
+            const updated = payload.new;
+            if (updated && isMounted) {
+              setMessages((prev) => {
+                const next = prev.map((m) =>
+                  m.id === updated.id
+                    ? { ...m, status: (updated.is_read ? "read" : "sent") as "read" | "sent" }
+                    : m
+                );
+                globalChatMessagesCache.set(cleanId, next);
+                return next;
               });
             }
           }
         )
         .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     } catch (err) {
       console.warn("Realtime subscription notice:", err);
     }
+
+    return () => {
+      isMounted = false;
+      if (channel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(channel);
+        } catch (e) {}
+      }
+    };
   }, [cleanId, currentUserId]);
 
   // Sync with localStorage thread summary
   const persistConversationSummary = React.useCallback((lastMsg: string) => {
     if (typeof window === "undefined") return;
     try {
-      const raw = localStorage.getItem("campsnest_dynamic_conversations");
+      const userKey = currentUserId ? `campsnest_dynamic_conversations_${currentUserId}` : "campsnest_dynamic_conversations";
+      const raw = localStorage.getItem(userKey);
       const existing: any[] = raw ? JSON.parse(raw) : [];
       const currentConv = {
         id: cleanId,
@@ -371,11 +429,11 @@ const globalChatMessagesCache = new Map<string, Message[]>();
       };
 
       const updated = [currentConv, ...existing.filter((c) => c.id !== cleanId)];
-      localStorage.setItem("campsnest_dynamic_conversations", JSON.stringify(updated));
+      localStorage.setItem(userKey, JSON.stringify(updated));
     } catch (e) {
       console.warn("Error saving conversation:", e);
     }
-  }, [cleanId, thread]);
+  }, [cleanId, currentUserId, thread]);
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -403,12 +461,16 @@ const globalChatMessagesCache = new Map<string, Message[]>();
     persistConversationSummary(text.trim());
 
     // Asynchronously write to Supabase database action & notify recipient
+    const targetRecipient = effectiveRecipientId || undefined;
     sendMessageAction({
       conversationId: cleanId,
+      senderId: currentUserId,
+      recipientId: targetRecipient,
+      senderName: profile?.name || user?.user_metadata?.full_name || "Campus Student",
       text: text.trim(),
       contextType: thread.context.type,
       contextTitle: thread.context.title,
-      senderName: "Me",
+      contextId: queryContextId || undefined,
     }).catch((err) => console.warn("Supabase send message background sync:", err));
   };
 

@@ -611,7 +611,7 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
               {/* Direct In-App & WhatsApp Contact CTAs */}
               <div className="space-y-2.5 pt-1">
                 <Link
-                  href={`/messages/h-${params.id}?context=housing&id=${params.id}&name=${encodeURIComponent(hostName)}&title=${encodeURIComponent(title)}&price=${price}${galleryImages[0]?.url && !galleryImages[0]?.url.startsWith("data:") && galleryImages[0]?.url.length < 300 ? `&image=${encodeURIComponent(galleryImages[0].url)}` : ""}`}
+                  href={`/messages/h-${params.id}?context=housing&id=${params.id}&recipientId=${house?.owner_id || house?.owner?.id || ""}&name=${encodeURIComponent(hostName)}&title=${encodeURIComponent(title)}&price=${price}${galleryImages[0]?.url && !galleryImages[0]?.url.startsWith("data:") && galleryImages[0]?.url.length < 300 ? `&image=${encodeURIComponent(galleryImages[0].url)}` : ""}`}
                   className="block w-full"
                 >
                   <button className="w-full py-3.5 px-4 rounded-full bg-gradient-to-r from-brand-violet to-brand-magenta hover:brightness-110 text-white text-xs sm:text-sm font-extrabold shadow-[0_4px_20px_rgba(236,72,153,0.35)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2">

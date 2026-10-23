@@ -189,7 +189,7 @@ export default function ConnectPage() {
           category: "vibe",
           title: `Vibe Wave Sent to ${candidate.name}! 👋`,
           description: `You connected with ${candidate.name} (${candidate.matchPercent}% synergy on Vibe Radar).`,
-          actionUrl: `/messages/c-${candidate.id}?context=connect&id=${candidate.id}&name=${encodeURIComponent(candidate.name)}&role=${encodeURIComponent(candidate.dept + " • " + candidate.level)}&score=${candidate.matchPercent}${candidate.avatar && !candidate.avatar.startsWith("data:") && candidate.avatar.length < 300 ? `&avatar=${encodeURIComponent(candidate.avatar)}` : ""}`,
+          actionUrl: `/messages/c-${candidate.id}?context=connect&id=${candidate.id}&recipientId=${candidate.id}&name=${encodeURIComponent(candidate.name)}&role=${encodeURIComponent(candidate.dept + " • " + candidate.level)}&score=${candidate.matchPercent}${candidate.avatar && !candidate.avatar.startsWith("data:") && candidate.avatar.length < 300 ? `&avatar=${encodeURIComponent(candidate.avatar)}` : ""}`,
           actionText: "Open In-App Chat",
         });
       }
@@ -601,7 +601,7 @@ export default function ConnectPage() {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-lg mx-auto pt-1">
                 
                 {/* Open In-App DM */}
-                <Link href={`/messages/${topMatch.id}`} className="block w-full sm:flex-1">
+                <Link href={`/messages/c-${topMatch.id}?context=connect&id=${topMatch.id}&recipientId=${topMatch.id}&name=${encodeURIComponent(topMatch.name)}&role=${encodeURIComponent(topMatch.dept + " • " + topMatch.level)}&score=${topMatch.matchPercent}${topMatch.avatar && !topMatch.avatar.startsWith("data:") && topMatch.avatar.length < 300 ? `&avatar=${encodeURIComponent(topMatch.avatar)}` : ""}`} className="block w-full sm:flex-1">
                   <button className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#8B5CF6] via-[#EC4899] to-[#8B5CF6] hover:opacity-95 text-white text-xs sm:text-sm font-extrabold shadow-[0_4px_24px_rgba(236,72,153,0.45)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2">
                     <MessageSquare className="h-4 w-4 fill-white" />
                     <span>Message in In-App Chat 💬</span>
@@ -887,7 +887,7 @@ export default function ConnectPage() {
 
                         {/* Open In-App DM */}
                         <Link
-                          href={`/messages/${candidate.id}`}
+                          href={`/messages/c-${candidate.id}?context=connect&id=${candidate.id}&recipientId=${candidate.id}&name=${encodeURIComponent(candidate.name)}&role=${encodeURIComponent(candidate.dept + " • " + candidate.level)}&score=${candidate.matchPercent}${candidate.avatar && !candidate.avatar.startsWith("data:") && candidate.avatar.length < 300 ? `&avatar=${encodeURIComponent(candidate.avatar)}` : ""}`}
                           onClick={(e) => e.stopPropagation()}
                           className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] text-white text-xs font-bold shadow-md shrink-0 flex items-center gap-1.5 hover:scale-105 active:scale-95 transition-all"
                         >

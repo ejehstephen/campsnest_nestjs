@@ -544,7 +544,7 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
               {/* Action Buttons */}
               <div className="space-y-2.5">
                 <Link 
-                  href={`/messages/m-${params.id}?context=market&id=${params.id}&name=${encodeURIComponent(sellerName)}&title=${encodeURIComponent(title)}&price=${price}${galleryImages[0]?.url && !galleryImages[0]?.url.startsWith("data:") && galleryImages[0]?.url.length < 300 ? `&image=${encodeURIComponent(galleryImages[0].url)}` : ""}`} 
+                  href={`/messages/m-${params.id}?context=market&id=${params.id}&recipientId=${sellerUser?.id || item.seller_id || item.seller?.id || ""}&name=${encodeURIComponent(sellerName)}&title=${encodeURIComponent(title)}&price=${price}${galleryImages[0]?.url && !galleryImages[0]?.url.startsWith("data:") && galleryImages[0]?.url.length < 300 ? `&image=${encodeURIComponent(galleryImages[0].url)}` : ""}`} 
                   className="block w-full"
                 >
                   <button className="w-full py-3.5 px-4 rounded-full bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] hover:from-[#9D74FF] hover:to-[#F472B6] text-white text-xs font-bold shadow-[0_4px_20px_rgba(236,72,153,0.4)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2">

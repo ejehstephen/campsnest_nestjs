@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { sanitizeUUID } from "@/lib/utils";
 import { fetchUserConversationsAction } from "@/lib/messages/actions";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { createClient } from "@/lib/supabase/client";
 
 export interface ConversationSummary {
   id: string;
@@ -28,7 +29,8 @@ export interface ConversationSummary {
 let globalConversationsCache: ConversationSummary[] | null = null;
 
 export default function MessagesPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const currentUserId = profile?.id || user?.id;
   const [conversations, setConversations] = React.useState<ConversationSummary[]>(
     () => globalConversationsCache || []
   );
@@ -49,13 +51,13 @@ export default function MessagesPage() {
 
       try {
         // 1. Fetch live conversations belonging strictly to current user from Supabase
-        const dbRes = await fetchUserConversationsAction();
+        const dbRes = await fetchUserConversationsAction(currentUserId);
         const dbList: ConversationSummary[] = dbRes.success && dbRes.conversations ? dbRes.conversations : [];
 
         // 2. Read locally cached dynamic conversations for this specific user
         let localList: ConversationSummary[] = [];
         if (typeof window !== "undefined") {
-          const userKey = profile?.id ? `campsnest_dynamic_conversations_${profile.id}` : null;
+          const userKey = currentUserId ? `campsnest_dynamic_conversations_${currentUserId}` : null;
           const raw = userKey ? localStorage.getItem(userKey) : null;
           if (raw) {
             try {
@@ -108,10 +110,40 @@ export default function MessagesPage() {
 
     loadConversations();
 
+    // Supabase Realtime subscription to refresh conversations on new messages or read receipts
+    let channel: any = null;
+    try {
+      const supabase = createClient();
+      channel = supabase
+        .channel("inbox-messages-changes")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "messages",
+          },
+          () => {
+            if (isMounted) {
+              loadConversations();
+            }
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn("Realtime inbox subscription warning:", e);
+    }
+
     return () => {
       isMounted = false;
+      if (channel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(channel);
+        } catch (e) {}
+      }
     };
-  }, [profile?.id]);
+  }, [currentUserId]);
 
   const filteredConversations = conversations.filter((conv) => {
     if (filterType !== "all" && conv.context.type !== filterType) return false;

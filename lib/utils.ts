@@ -222,6 +222,33 @@ export function sanitizeUUID(rawId: string): string {
 }
 
 /**
+ * Generate a deterministic, collision-free RFC4122 v4 UUID for a 1-on-1 conversation
+ * between two users (and optional context ID). Both participants will always generate
+ * the identical conversation ID regardless of who initiates, preventing multi-user leakage.
+ */
+export function getDeterministicConversationId(user1: string, user2: string, contextId = ""): string {
+  if (!user1 && !user2) return "00000000-0000-4000-8000-000000000000";
+  const sorted = [user1.trim().toLowerCase(), user2.trim().toLowerCase()].sort();
+  const rawKey = `${sorted[0]}#${sorted[1]}#${contextId.trim().toLowerCase()}`;
+
+  let h1 = 0xdeadbeef ^ rawKey.length;
+  let h2 = 0x41c6ce57 ^ rawKey.length;
+  for (let i = 0; i < rawKey.length; i++) {
+    const ch = rawKey.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+
+  const hex1 = ((h1 >>> 0).toString(16) + (h2 >>> 0).toString(16)).padStart(16, "0");
+  const hex2 = (((h2 ^ 0x5a5a5a5a) >>> 0).toString(16) + ((h1 ^ 0xa5a5a5a5) >>> 0).toString(16)).padStart(16, "0");
+  const hex = (hex1 + hex2).slice(0, 32);
+
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/**
  * Check if a URL points to a video file (.mp4, .webm, .mov, etc.)
  */
 export function isVideoUrl(url: string | undefined | null): boolean {

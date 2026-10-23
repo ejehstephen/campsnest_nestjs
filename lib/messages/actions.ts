@@ -50,15 +50,18 @@ function formatRelativeTime(dateString?: string): string {
  * Fetch all conversations for the authenticated user only.
  * Other users' conversations are strictly excluded.
  */
-export async function fetchUserConversationsAction(): Promise<{
+export async function fetchUserConversationsAction(explicitUserId?: string): Promise<{
   success: boolean;
   conversations: any[];
   error?: string;
 }> {
   try {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const currentUserId = user?.id;
+    let currentUserId = explicitUserId;
+    if (!currentUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      currentUserId = user?.id;
+    }
 
     // If user is not authenticated, do not expose any user conversations
     if (!currentUserId) {
@@ -68,7 +71,53 @@ export async function fetchUserConversationsAction(): Promise<{
     // 1. Gather all conversation IDs where current user is a participant or sender
     const userConvIds = new Set<string>();
 
-    // A. Check conversation_participants table
+    // A. Check context_id ILIKE for current user ID (1-on-1 tagged conversations)
+    try {
+      const { data: taggedConvs } = await supabase
+        .from("conversations")
+        .select("id")
+        .ilike("context_id", `%${currentUserId}%`);
+
+      (taggedConvs || []).forEach((c) => {
+        if (c.id) userConvIds.add(c.id);
+      });
+    } catch (e) {
+      // ignore
+    }
+
+    // B. Check messages sent by current user
+    try {
+      const { data: userSentMsgs } = await supabase
+        .from("messages")
+        .select("conversation_id")
+        .eq("sender_id", currentUserId);
+
+      (userSentMsgs || []).forEach((m) => {
+        if (m.conversation_id) userConvIds.add(m.conversation_id);
+      });
+    } catch (e) {
+      // ignore
+    }
+
+    // C. Check notifications sent to current user linking to /messages/
+    try {
+      const { data: userNotifs } = await supabase
+        .from("notifications")
+        .select("action_url")
+        .eq("user_id", currentUserId)
+        .ilike("action_url", "/messages/%");
+
+      (userNotifs || []).forEach((n) => {
+        if (n.action_url) {
+          const raw = n.action_url.replace("/messages/", "").split("?")[0];
+          if (raw) userConvIds.add(sanitizeUUID(raw));
+        }
+      });
+    } catch (e) {
+      // ignore
+    }
+
+    // D. Check conversation_participants table
     try {
       const { data: participants } = await supabase
         .from("conversation_participants")
@@ -79,20 +128,10 @@ export async function fetchUserConversationsAction(): Promise<{
         if (p.conversation_id) userConvIds.add(p.conversation_id);
       });
     } catch (e) {
-      // conversation_participants table may be empty or newly created
+      // ignore
     }
 
-    // B. Check messages sent by current user
-    const { data: userSentMsgs } = await supabase
-      .from("messages")
-      .select("conversation_id")
-      .eq("sender_id", currentUserId);
-
-    (userSentMsgs || []).forEach((m) => {
-      if (m.conversation_id) userConvIds.add(m.conversation_id);
-    });
-
-    // C. Check conversations on listings or items owned by current user
+    // E. Check conversations on listings or items owned by current user
     try {
       const [housesRes, itemsRes] = await Promise.all([
         supabase.from("room_listings").select("id").eq("owner_id", currentUserId),
@@ -156,8 +195,13 @@ export async function fetchUserConversationsAction(): Promise<{
 
       // Identify the other participant (not the current logged-in user)
       const otherSenderMsg = convMsgs.find((m) => m.sender_id && m.sender_id !== currentUserId && userMap.has(m.sender_id));
-      const senderUser = otherSenderMsg
-        ? userMap.get(otherSenderMsg.sender_id)
+      let otherUserId = otherSenderMsg?.sender_id;
+      if (!otherUserId && conv.context_id) {
+        const parts = conv.context_id.split(":");
+        otherUserId = parts.find((p: string) => p !== currentUserId && p.length > 20);
+      }
+      const senderUser = otherUserId
+        ? userMap.get(otherUserId)
         : convMsgs.find((m) => m.sender_id && userMap.has(m.sender_id))
         ? userMap.get(convMsgs.find((m) => m.sender_id && userMap.has(m.sender_id))!.sender_id)
         : null;
@@ -218,6 +262,7 @@ export async function fetchConversationThreadAction(conversationId: string): Pro
     id: string;
     title: string;
     type: "market" | "housing" | "connect";
+    participantId?: string;
     participantName: string;
     participantRole: string;
     participantAvatar: string;
@@ -306,6 +351,7 @@ export async function fetchConversationThreadAction(conversationId: string): Pro
         id: cleanId,
         title: cleanTitle,
         type: (conv?.type || "housing") as "market" | "housing" | "connect",
+        participantId: targetUserId,
         participantName,
         participantRole,
         participantAvatar,
@@ -354,6 +400,7 @@ export async function fetchListingDetailsAction(
   price?: number;
   sellerOrHostName?: string;
   sellerAvatar?: string;
+  sellerOrHostId?: string;
   imageUrl?: string;
   isVideo?: boolean;
 }> {
@@ -401,13 +448,14 @@ export async function fetchListingDetailsAction(
         price: listing?.price,
         sellerOrHostName: ownerName,
         sellerAvatar: ownerAvatar || undefined,
+        sellerOrHostId: listing?.owner_id || undefined,
         imageUrl: mediaUrl || undefined,
         isVideo,
       };
     } else {
       const { data: item } = await supabase
         .from("marketplace_items")
-        .select("id, title, price, seller_name, seller_avatar, image")
+        .select("id, title, price, seller_name, seller_avatar, image, seller_id")
         .eq("id", cleanId)
         .single();
 
@@ -416,6 +464,7 @@ export async function fetchListingDetailsAction(
         price: item?.price,
         sellerOrHostName: item?.seller_name || "Student Seller",
         sellerAvatar: item?.seller_avatar || undefined,
+        sellerOrHostId: item?.seller_id || undefined,
         imageUrl: item?.image && !item.image.startsWith("data:") ? item.image : undefined,
         isVideo: false,
       };
@@ -430,12 +479,14 @@ export async function fetchListingDetailsAction(
  */
 export async function sendMessageAction(params: {
   conversationId: string;
+  senderId?: string;
   recipientId?: string;
   senderName?: string;
   text: string;
   imageUrl?: string;
   contextType?: "market" | "housing" | "connect";
   contextTitle?: string;
+  contextId?: string;
 }): Promise<{
   success: boolean;
   message?: any;
@@ -444,16 +495,50 @@ export async function sendMessageAction(params: {
   try {
     const cleanConvId = sanitizeUUID(params.conversationId);
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    let senderId = user?.id;
+    let senderId = params.senderId;
     if (!senderId) {
-      senderId = "433b3374-3bc7-41a3-9207-bc5e1f9d5627";
+      const { data: { user } } = await supabase.auth.getUser();
+      senderId = user?.id || "433b3374-3bc7-41a3-9207-bc5e1f9d5627";
     }
+
+    let recipientId = params.recipientId;
+    if (!recipientId && senderId) {
+      // Find other participant from previous messages
+      const { data: priorMsgs } = await supabase
+        .from("messages")
+        .select("sender_id")
+        .eq("conversation_id", cleanConvId)
+        .neq("sender_id", senderId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (priorMsgs?.[0]?.sender_id) {
+        recipientId = priorMsgs[0].sender_id;
+      } else {
+        const { data: partRows } = await supabase
+          .from("conversation_participants")
+          .select("user_id")
+          .eq("conversation_id", cleanConvId)
+          .neq("user_id", senderId)
+          .limit(1);
+        if (partRows?.[0]?.user_id) {
+          recipientId = partRows[0].user_id;
+        }
+      }
+    }
+
+    // Prepare participants tagging for context_id so both users always find this conversation
+    const participantsTag = recipientId && senderId
+      ? [senderId, recipientId].sort().join(":")
+      : senderId;
+    const contextTag = params.contextId
+      ? `${params.contextId}:${participantsTag}`
+      : participantsTag;
 
     // 1. Ensure conversation exists in conversations table
     const { data: existingConv } = await supabase
       .from("conversations")
-      .select("id")
+      .select("id, context_id")
       .eq("id", cleanConvId)
       .maybeSingle();
 
@@ -462,21 +547,26 @@ export async function sendMessageAction(params: {
         id: cleanConvId,
         title: params.contextTitle || "Direct Conversation",
         type: params.contextType || "housing",
+        context_id: contextTag || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
     } else {
+      const updatePayload: any = { updated_at: new Date().toISOString() };
+      if (!existingConv.context_id || !existingConv.context_id.includes(":")) {
+        updatePayload.context_id = contextTag || existingConv.context_id;
+      }
       await supabase
         .from("conversations")
-        .update({ updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq("id", cleanConvId);
     }
 
     // Register participants in conversation_participants
     try {
       const participants = [{ conversation_id: cleanConvId, user_id: senderId }];
-      if (params.recipientId && params.recipientId !== senderId) {
-        participants.push({ conversation_id: cleanConvId, user_id: params.recipientId });
+      if (recipientId && recipientId !== senderId) {
+        participants.push({ conversation_id: cleanConvId, user_id: recipientId });
       }
       await supabase
         .from("conversation_participants")
@@ -507,14 +597,14 @@ export async function sendMessageAction(params: {
     }
 
     // 3. Dispatch in-database notification for recipient in Supabase
-    if (params.recipientId) {
+    if (recipientId) {
       try {
         await createNotificationAction({
-          userId: params.recipientId,
+          userId: recipientId,
           title: `New message from ${params.senderName || "a student"} 💬`,
           body: params.text.length > 80 ? `${params.text.slice(0, 80)}...` : params.text,
           type: params.contextType || "message",
-          actionUrl: `/messages/${params.conversationId}`,
+          actionUrl: `/messages/${cleanConvId}`,
           actionText: "Reply",
         });
       } catch (ne) {
@@ -522,7 +612,7 @@ export async function sendMessageAction(params: {
       }
     }
 
-    revalidatePath(`/messages/${params.conversationId}`);
+    revalidatePath(`/messages/${cleanConvId}`);
     revalidatePath("/messages");
 
     return {
@@ -537,6 +627,45 @@ export async function sendMessageAction(params: {
     };
   } catch (err: any) {
     console.error("sendMessageAction error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Mark all unread messages in a conversation as read when viewed by the recipient.
+ */
+export async function markConversationAsReadAction(
+  conversationId: string,
+  explicitUserId?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const cleanId = sanitizeUUID(conversationId);
+    const supabase = createClient();
+    let currentUserId = explicitUserId;
+    if (!currentUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      currentUserId = user?.id;
+    }
+
+    if (!currentUserId) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    // Mark messages not sent by the current viewer as read
+    const { error } = await supabase
+      .from("messages")
+      .update({ is_read: true })
+      .eq("conversation_id", cleanId)
+      .neq("sender_id", currentUserId)
+      .eq("is_read", false);
+
+    if (error) {
+      console.warn("markConversationAsReadAction notice:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
     return { success: false, error: err.message };
   }
 }

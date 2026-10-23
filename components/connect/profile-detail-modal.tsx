@@ -45,7 +45,7 @@ export function ProfileDetailModal({ profile, isOpen, onClose, onWave, isWaved }
       category: "vibe",
       title: `Vibe Wave Sent to ${profile.name}! 👋`,
       description: `You connected with ${profile.name} (${profile.matchPercent}% compatibility on Vibe Radar).`,
-      actionUrl: `/messages/c-${profile.id}?context=connect&id=${profile.id}&name=${encodeURIComponent(profile.name)}&role=${encodeURIComponent(profile.dept + " • " + profile.level)}&score=${profile.matchPercent}${profile.avatar && profile.avatar.startsWith("http") && profile.avatar.length < 300 ? `&avatar=${encodeURIComponent(profile.avatar)}` : ""}`,
+      actionUrl: `/messages/c-${profile.id}?context=connect&id=${profile.id}&recipientId=${profile.id}&name=${encodeURIComponent(profile.name)}&role=${encodeURIComponent(profile.dept + " • " + profile.level)}&score=${profile.matchPercent}${profile.avatar && profile.avatar.startsWith("http") && profile.avatar.length < 300 ? `&avatar=${encodeURIComponent(profile.avatar)}` : ""}`,
       actionText: "Open In-App Chat",
     });
   };
@@ -304,7 +304,7 @@ export function ProfileDetailModal({ profile, isOpen, onClose, onWave, isWaved }
 
           {/* In-App Direct Message */}
           <a
-            href={`/messages/c-${profile.id}?context=connect&id=${profile.id}&name=${encodeURIComponent(profile.name)}&role=${encodeURIComponent(profile.dept + " • " + profile.level)}&score=${profile.matchPercent}${profile.avatar && profile.avatar.startsWith("http") && profile.avatar.length < 300 ? `&avatar=${encodeURIComponent(profile.avatar)}` : ""}`}
+            href={`/messages/c-${profile.id}?context=connect&id=${profile.id}&recipientId=${profile.id}&name=${encodeURIComponent(profile.name)}&role=${encodeURIComponent(profile.dept + " • " + profile.level)}&score=${profile.matchPercent}${profile.avatar && profile.avatar.startsWith("http") && profile.avatar.length < 300 ? `&avatar=${encodeURIComponent(profile.avatar)}` : ""}`}
             className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-[#8B5CF6] via-[#EC4899] to-[#8B5CF6] hover:opacity-95 text-white text-xs sm:text-sm font-bold shadow-[0_4px_20px_rgba(236,72,153,0.4)] flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 text-center"
           >
             <MessageSquare className="h-4 w-4 fill-white" />
