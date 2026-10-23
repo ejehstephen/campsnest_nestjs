@@ -1,3 +1,4 @@
+
 import type { Metadata } from "next";
 import { fetchMarketItemByIdAction } from "@/lib/market/actions";
 import { MARKET_PRODUCTS } from "@/lib/market/constants";
@@ -37,13 +38,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     };
   }
 
-  // Extract authentic product image for this specific marketplace item
-  let imageUrl = "https://campsnest.com/campsnest-logo.png";
-  if (Array.isArray(item.images) && item.images.length > 0) {
-    imageUrl = typeof item.images[0] === "string" ? item.images[0] : (item.images[0]?.url || imageUrl);
-  } else if (item.image) {
-    imageUrl = item.image;
-  }
+  // Dedicated HTTP image route that always serves valid binary image data (handling base64 or storage URLs)
+  const imageUrl = `https://campsnest.com/api/item-image/${id}`;
 
   const title = `${item.title} — ₦${Number(item.price || 0).toLocaleString()}`;
   const description = `${item.condition ? item.condition.replace(/_/g, " ") : "Fairly used"} ${item.category || "item"} on CampsNest Campus Marketplace. ${item.description ? item.description.slice(0, 150) : "Verified student deal."}`;

@@ -37,16 +37,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     };
   }
 
-  // Extract the authentic image of this specific accommodation listing
-  const dbImages = (listing.room_listing_images || []).map((r: any) => r.images || r.image).filter(Boolean);
-  let imageUrl = "https://campsnest.com/campsnest-logo.png";
-  if (Array.isArray(listing.images) && listing.images.length > 0) {
-    imageUrl = typeof listing.images[0] === "string" ? listing.images[0] : (listing.images[0]?.url || imageUrl);
-  } else if (dbImages.length > 0) {
-    imageUrl = dbImages[0];
-  } else if (listing.image) {
-    imageUrl = listing.image;
-  }
+  // Dedicated HTTP image route that always serves valid binary image data (handling base64 or storage URLs)
+  const imageUrl = `https://campsnest.com/api/housing-image/${id}`;
 
   const title = `${listing.title} — ₦${Number(listing.price || 0).toLocaleString()}/yr`;
   const description = `${listing.house_type ? listing.house_type.replace(/_/g, " ") : "Accommodation"} in ${listing.location || "Campus"}. ${listing.description ? listing.description.slice(0, 150) : "Verified student lodge listing on CampsNest."}`;

@@ -162,7 +162,7 @@ export default function ProfilePage() {
           price: h.price,
           status: "Active",
           inquiries: 9,
-          image: h.image || (h.images && h.images[0]) || "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&auto=format&fit=crop&q=80"
+          image: h.image || (h.images && h.images[0]) || "/campsnest-logo.png"
         }));
 
       const activeDbListings = (dbListings || []).filter((item: any) => !isListingDeleted(item.id));

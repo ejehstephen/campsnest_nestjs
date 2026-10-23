@@ -79,7 +79,7 @@ export async function fetchUserAllListingsAction(userId?: string): Promise<Profi
 
       if (houseItems && houseItems.length > 0) {
         houseItems.forEach((h) => {
-          const img = (h.room_listing_images && h.room_listing_images[0]?.images) || "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&auto=format&fit=crop&q=80";
+          const img = (h.room_listing_images && h.room_listing_images[0]?.images) || "/campsnest-logo.png";
           results.push({
             id: h.id,
             type: "housing",
@@ -117,7 +117,7 @@ function sanitizeHousingItem(h: any): HousingItem {
     priceUnit: h.priceUnit || "/ year",
     distance: h.distance || "5 mins to Gate",
     photoCount: h.photoCount || (h.images?.length || 1),
-    image: h.image || "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&auto=format&fit=crop&q=80",
+    image: h.image || "/campsnest-logo.png",
     images: h.images || [h.image],
     description: h.description,
     features: [],
@@ -182,7 +182,7 @@ export async function fetchUserSavedHousesAction(savedIds: string[] = []): Promi
       priceUnit: "/ year",
       distance: h.distance_from_campus || "5 mins to Gate",
       photoCount: h.room_listing_images?.length || 1,
-      image: (h.room_listing_images && h.room_listing_images[0]?.images) || "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&auto=format&fit=crop&q=80",
+      image: (h.room_listing_images && h.room_listing_images[0]?.images) || "/campsnest-logo.png",
       images: h.room_listing_images?.map((i: any) => i.images) || [],
       description: h.description,
       features: [],
@@ -239,7 +239,7 @@ export async function fetchUserInspectionsAction(userId?: string): Promise<Profi
         id: i.id,
         listingId: i.listing_id,
         listingTitle: i.listing?.title || "Campus Accommodation",
-        listingImage: i.listing?.room_listing_images?.[0]?.images || "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&auto=format&fit=crop&q=80",
+        listingImage: i.listing?.room_listing_images?.[0]?.images || "/campsnest-logo.png",
         location: i.listing?.location || "FU Wukari Campus Area",
         preferredDate: i.preferred_date,
         preferredTimeSlot: i.preferred_time_slot,

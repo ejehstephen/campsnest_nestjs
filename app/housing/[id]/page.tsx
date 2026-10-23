@@ -112,12 +112,9 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
     priceUnit: "/ year",
     distance: "6 mins to Gate",
     photoCount: 4,
-    image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80",
+    image: "/campsnest-logo.png",
     images: [
-      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=600&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=600&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&auto=format&fit=crop&q=80"
+      "/campsnest-logo.png"
     ],
     description: "Fully tiled executive student accommodation with constant borehole water, dedicated prepaid meter, perimeter electric fence, and solar inverter backup.",
     features: [
@@ -145,8 +142,7 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
     : house.image
     ? [house.image]
     : [
-        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80",
-        "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=600&auto=format&fit=crop&q=80"
+        "/campsnest-logo.png"
       ];
 
   const galleryImages = rawImages.map((url, idx) => ({
@@ -697,6 +693,7 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
           price={price}
           category="Housing"
           image={galleryImages[0]?.url}
+          url={typeof window !== "undefined" ? window.location.href : `https://campsnest.com/housing/${params.id}`}
           description={description}
         />
 

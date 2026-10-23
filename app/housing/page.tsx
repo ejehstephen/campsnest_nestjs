@@ -176,7 +176,7 @@ export default function HousingDiscoveryPage() {
             .filter((item: any) => !isListingDeleted(item.id))
             .map((item: any) => {
               const dbImages = item.room_listing_images?.map((r: any) => r.images).filter(Boolean) || [];
-              const primaryImg = item.image || (dbImages.length > 0 ? dbImages[0] : "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80");
+              const primaryImg = item.image || (dbImages.length > 0 ? dbImages[0] : "/campsnest-logo.png");
               
               const ownerRecord = item.owner || null;
               const hostName = parseUserName(ownerRecord, null, item.host_name || "Verified Campus Host");
@@ -709,8 +709,11 @@ export default function HousingDiscoveryPage() {
             isOpen={!!shareHouse}
             onClose={() => setShareHouse(null)}
             title={shareHouse.title}
-            url={typeof window !== "undefined" ? `${window.location.origin}/housing/${shareHouse.id}` : ""}
-            description={`Check out ${shareHouse.title} for ₦${shareHouse.price.toLocaleString()} in ${selectedCampus?.name || "campus"} on CampsNest.`}
+            price={shareHouse.price}
+            category="Accommodation"
+            image={shareHouse.image || (Array.isArray(shareHouse.images) && shareHouse.images[0]) || "/campsnest-logo.png"}
+            url={typeof window !== "undefined" ? `${window.location.origin}/housing/${shareHouse.id}` : `https://campsnest.com/housing/${shareHouse.id}`}
+            description={shareHouse.description || `Check out ${shareHouse.title} for ₦${Number(shareHouse.price).toLocaleString()}/yr on CampsNest.`}
           />
         )}
 

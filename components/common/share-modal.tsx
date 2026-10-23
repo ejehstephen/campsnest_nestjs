@@ -35,8 +35,7 @@ export function ShareModal({
 }: ShareModalProps) {
   const [copied, setCopied] = React.useState(false);
 
-  if (!isOpen) return null;
-
+  const currentUrl = url || (typeof window !== "undefined" ? window.location.href : "https://campsnest.com");
   const isHousing = (category || "").toLowerCase().includes("hous") || (category || "").toLowerCase().includes("lodge") || (category || "").toLowerCase().includes("room");
   const platformName = isHousing ? "CampsNest Student Housing" : "CampsNest Campus Marketplace";
   const formattedPrice = price ? (isHousing ? ` for ₦${Number(price).toLocaleString()}/yr` : ` for ₦${Number(price).toLocaleString()}`) : "";
@@ -83,6 +82,8 @@ export function ShareModal({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
       {/* Backdrop click */}
@@ -120,13 +121,14 @@ export function ShareModal({
 
         {/* Snippet Preview Card */}
         <div className="relative z-10 p-3 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-3">
-          {image && (
-            <img
-              src={image}
-              alt={title}
-              className="h-14 w-14 rounded-xl object-cover border border-white/10 shrink-0"
-            />
-          )}
+          <img
+            src={image || "/campsnest-logo.png"}
+            alt={title}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = "/campsnest-logo.png";
+            }}
+            className="h-14 w-14 rounded-xl object-cover border border-white/10 shrink-0 bg-[#0E0B1F]"
+          />
           <div className="min-w-0 flex-1">
             <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-brand-violet/30 text-brand-violet-light border border-brand-violet/30">
               {category}

@@ -734,6 +734,7 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
           price={price}
           category={category}
           image={galleryImages[0]?.url}
+          url={typeof window !== "undefined" ? window.location.href : `https://campsnest.com/market/${params.id}`}
           description={description}
         />
 

@@ -110,7 +110,7 @@ export default function HomeFeedPage() {
             .filter((item: any) => !isListingDeleted(item.id))
             .map((item: any) => {
               const dbImages = item.room_listing_images?.map((r: any) => r.images).filter(Boolean) || [];
-              const primaryImg = item.image || (dbImages.length > 0 ? dbImages[0] : "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80");
+              const primaryImg = item.image || (dbImages.length > 0 ? dbImages[0] : "/campsnest-logo.png");
               const ownerRecord = item.owner || null;
               const hostName = ownerRecord?.name || item.host_name || "Verified Campus Host";
               const hostRole = ownerRecord?.level || (ownerRecord?.role === "admin" ? "Verified Host Admin" : "Lodge Host");

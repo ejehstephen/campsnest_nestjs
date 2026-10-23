@@ -83,13 +83,7 @@ const AMENITIES_OPTIONS = [
   { id: "fenced", label: "Perimeter Electric Fence", icon: Building2 }
 ];
 
-const SAMPLE_HOUSE_PHOTOS = [
-  "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?w=1200&auto=format&fit=crop&q=80"
-];
+
 
 export function PostHouseModal({ isOpen, onClose, onPublish, currentCampus }: PostHouseModalProps) {
   const { profile } = useAuth();

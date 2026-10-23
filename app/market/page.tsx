@@ -556,8 +556,11 @@ export default function MarketPage() {
             isOpen={!!shareItem}
             onClose={() => setShareItem(null)}
             title={shareItem.title}
-            url={typeof window !== "undefined" ? `${window.location.origin}/market` : ""}
-            description={`Check out ${shareItem.title} for ₦${shareItem.price.toLocaleString()} in ${selectedCampus?.name || "campus"} on CampsNest.`}
+            price={shareItem.price}
+            category={shareItem.category || "Item"}
+            image={shareItem.image || (Array.isArray(shareItem.images) && shareItem.images[0]) || "/campsnest-logo.png"}
+            url={typeof window !== "undefined" ? `${window.location.origin}/market/${shareItem.id}` : `https://campsnest.com/market/${shareItem.id}`}
+            description={shareItem.description || `Check out ${shareItem.title} for ₦${Number(shareItem.price).toLocaleString()} on CampsNest.`}
           />
         )}
 

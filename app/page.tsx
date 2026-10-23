@@ -263,12 +263,7 @@ export default function LandingPage() {
                   <span className="text-[10px] text-text-dim">Fully Tiled • Prepaid Meter • Water</span>
                 </div>
 
-                <img
-                  src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=700&auto=format&fit=crop&q=80"
-                  alt=""
-                  onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                  className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+
                 <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
                   <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/90 text-[10px] font-bold text-white shadow">
                     Verified Host
