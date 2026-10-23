@@ -37,14 +37,6 @@ import { compressAvatarImage } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { BrandLogo } from "@/components/common/brand-logo";
 
-const AVATAR_PRESETS = [
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=200&auto=format&fit=crop&q=80",
-];
 
 const ACADEMIC_LEVELS = [
   "100L",
@@ -230,9 +222,9 @@ export default function SignUpPage() {
     e.preventDefault();
     setError(null);
 
-    // 1. Validate Required Profile Image
+    // 1. Validate Required Profile Image from device
     if (!selectedAvatar || selectedAvatar.trim() === "") {
-      setError("Profile picture is required. Please upload your photo or select a verified avatar.");
+      setError("Profile picture is required. Please select and upload a profile photo from your device.");
       return;
     }
 
@@ -639,15 +631,15 @@ export default function SignUpPage() {
 
               <form onSubmit={handleStep3Submit} className="space-y-5">
                 
-                {/* 1. REQUIRED Profile Picture Upload & Presets */}
-                <div className="space-y-2.5 text-center p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                {/* 1. REQUIRED Profile Picture Upload From Device */}
+                <div className="space-y-3 text-center p-5 rounded-2xl bg-white/[0.03] border border-white/10">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-white flex items-center gap-1.5">
                       <Camera className="h-4 w-4 text-brand-violet-light" />
                       <span>Profile Picture</span>
                       <span className="text-brand-magenta font-extrabold">* (Required)</span>
                     </label>
-                    <span className="text-[10px] font-semibold text-text-dim">Tap circle to upload</span>
+                    <span className="text-[10px] font-semibold text-text-dim">Device Upload Only</span>
                   </div>
                   
                   <input
@@ -662,7 +654,7 @@ export default function SignUpPage() {
                   <div className="flex flex-col items-center py-2">
                     <div
                       onClick={() => fileInputRef.current?.click()}
-                      className={`relative h-24 w-24 sm:h-28 sm:w-28 rounded-full mx-auto border-2 transition-all cursor-pointer group flex flex-col items-center justify-center overflow-hidden shadow-2xl hover:scale-105 ${
+                      className={`relative h-28 w-28 sm:h-32 sm:w-32 rounded-full mx-auto border-2 transition-all cursor-pointer group flex flex-col items-center justify-center overflow-hidden shadow-2xl hover:scale-105 ${
                         selectedAvatar
                           ? "border-emerald-400 bg-white/[0.04]"
                           : "border-dashed border-brand-magenta animate-pulse bg-brand-magenta/[0.06] hover:bg-brand-magenta/[0.12]"
@@ -681,44 +673,46 @@ export default function SignUpPage() {
                           </div>
                         </>
                       ) : (
-                        <div className="flex flex-col items-center justify-center text-text-muted group-hover:text-white space-y-1">
-                          <Upload className="h-6 w-6 text-brand-magenta-light group-hover:scale-110 transition-transform" />
-                          <span className="text-[10px] font-bold text-white">Upload Photo</span>
-                          <span className="text-[9px] text-brand-magenta font-semibold">* Required</span>
+                        <div className="flex flex-col items-center justify-center text-text-muted group-hover:text-white space-y-1.5 p-2">
+                          <div className="h-10 w-10 rounded-full bg-brand-magenta/15 flex items-center justify-center text-brand-magenta-light group-hover:scale-110 transition-transform">
+                            <Upload className="h-5 w-5" />
+                          </div>
+                          <span className="text-[11px] font-bold text-white">Select from Device</span>
+                          <span className="text-[9px] text-brand-magenta font-semibold">* Tap to Choose</span>
                         </div>
                       )}
 
                       <div className={`absolute bottom-0 inset-x-0 py-0.5 text-[8px] font-extrabold text-white text-center tracking-wider ${
                         selectedAvatar ? "bg-emerald-600/90" : "bg-brand-magenta/90"
                       }`}>
-                        {selectedAvatar ? "PHOTO READY" : "TAP TO UPLOAD"}
+                        {selectedAvatar ? "PHOTO READY" : "DEVICE UPLOAD"}
                       </div>
                     </div>
                   </div>
 
-                  {/* Quick Avatar Presets */}
-                  <div className="space-y-1.5 pt-1">
-                    <p className="text-[10px] text-text-dim text-left">Or choose a verified student avatar:</p>
-                    <div className="flex items-center justify-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                      {AVATAR_PRESETS.map((preset, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            setSelectedAvatar(preset);
-                            setError(null);
-                          }}
-                          className={`relative h-10 w-10 rounded-full overflow-hidden border-2 transition-transform shrink-0 ${
-                            selectedAvatar === preset
-                              ? "border-emerald-400 scale-110 shadow-glow-magenta"
-                              : "border-white/20 hover:border-white/50 opacity-70 hover:opacity-100"
-                          }`}
-                        >
-                          <img src={preset} alt={`Avatar ${idx + 1}`} className="h-full w-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
+                  {/* Action Buttons for Device Upload */}
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-4 py-2 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 text-white text-xs font-bold flex items-center gap-2 transition-all hover:scale-102"
+                    >
+                      <Upload className="h-3.5 w-3.5 text-brand-magenta-light" />
+                      <span>{selectedAvatar ? "Choose Different Photo from Device" : "Choose Photo from Device / Gallery"}</span>
+                    </button>
+                    {selectedAvatar && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAvatar("")}
+                        className="px-3.5 py-2 rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-xs font-semibold transition-all"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
+                  <p className="text-[10px] text-text-dim">
+                    Supports JPG, PNG, WEBP. Select a clear picture from your device gallery or camera.
+                  </p>
                 </div>
 
                 {/* 2. REQUIRED WhatsApp Phone Number */}
