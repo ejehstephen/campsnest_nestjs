@@ -3,11 +3,15 @@
 import * as React from "react";
 import { ShieldAlert, X, CheckCircle2, AlertTriangle, Send } from "lucide-react";
 
+import { submitReportAction } from "@/lib/admin/actions";
+import { useAuth } from "@/lib/auth/auth-provider";
+
 export interface ReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   targetTitle: string;
   targetType?: "user" | "listing" | "housing" | "message";
+  targetId?: string;
 }
 
 const REPORT_REASONS = [
@@ -43,7 +47,9 @@ export function ReportModal({
   onClose,
   targetTitle,
   targetType = "listing",
+  targetId,
 }: ReportModalProps) {
+  const { profile, user } = useAuth();
   const [selectedReason, setSelectedReason] = React.useState<string>("scam");
   const [details, setDetails] = React.useState<string>("");
   const [submitted, setSubmitted] = React.useState<boolean>(false);
@@ -51,18 +57,34 @@ export function ReportModal({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
+      const mappedType = targetType === "housing" || targetType === "listing" 
+        ? "housing" 
+        : targetType === "user" 
+        ? "user" 
+        : "market";
+
+      await submitReportAction({
+        reporterId: profile?.id || user?.id,
+        targetType: mappedType,
+        targetId: targetId,
+        reason: selectedReason,
+        details: `${targetTitle}: ${details.trim()}`,
+      });
+    } catch (err) {
+      console.warn("Report submission background notice:", err);
+    } finally {
       setIsSubmitting(false);
       setSubmitted(true);
       setTimeout(() => {
         setSubmitted(false);
         onClose();
       }, 2000);
-    }, 1000);
+    }
   };
 
   return (

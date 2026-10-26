@@ -10,11 +10,12 @@ import {
   Users, 
   UserCircle2, 
   Sparkles,
-  Radio
+  Radio,
+  ShieldCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/common/brand-logo";
-
+import { useAuth } from "@/lib/auth/auth-provider";
 
 const NAV_ITEMS = [
   { label: "Home", href: "/home", icon: Home },
@@ -26,6 +27,14 @@ const NAV_ITEMS = [
 
 export function DesktopSidebar() {
   const pathname = usePathname();
+  const { profile, user } = useAuth();
+
+  const isAdmin = 
+    profile?.role === "admin" || 
+    profile?.role === "super_admin" || 
+    profile?.is_super_admin || 
+    profile?.email === "stephenejeh92@gmail.com" ||
+    user?.email === "stephenejeh92@gmail.com";
 
   return (
     <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 border-r border-white/10 bg-[#0E0B1F]/95 backdrop-blur-2xl z-40 p-5 justify-between select-none">
@@ -39,7 +48,6 @@ export function DesktopSidebar() {
           href="/"
           className="hover:scale-[1.02] transition-transform"
         />
-
 
         {/* Navigation Routes */}
         <nav className="space-y-2">
@@ -66,6 +74,26 @@ export function DesktopSidebar() {
               </Link>
             );
           })}
+
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className={cn(
+                "flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-semibold transition-all duration-150 select-none group mt-2 border border-brand-violet/20",
+                pathname.startsWith("/admin")
+                  ? "bg-brand-violet text-white font-bold shadow-[0_4px_16px_rgba(139,92,246,0.35)]"
+                  : "bg-brand-violet/10 text-brand-violet-light hover:bg-brand-violet/20"
+              )}
+            >
+              <div className="flex items-center gap-3.5">
+                <ShieldCheck className="h-4 w-4 text-brand-magenta" />
+                <span className="tracking-wide">Admin Hub</span>
+              </div>
+              <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-brand-magenta text-white">
+                Admin
+              </span>
+            </Link>
+          )}
         </nav>
       </div>
 

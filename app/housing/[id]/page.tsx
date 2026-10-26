@@ -745,7 +745,8 @@ export default function HousingDetailPage({ params }: { params: { id: string } }
           isOpen={reportModalOpen}
           onClose={() => setReportModalOpen(false)}
           targetTitle={title}
-          targetType="listing"
+          targetType="housing"
+          targetId={typeof params?.id === "string" ? params.id : undefined}
         />
 
         {/* Delete Lodge Listing Modal */}

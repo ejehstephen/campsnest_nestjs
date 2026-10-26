@@ -278,6 +278,15 @@ export default function ProfilePage() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {(profile?.role === "admin" || profile?.role === "super_admin" || profile?.is_super_admin || profile?.email === "stephenejeh92@gmail.com") && (
+                  <Link href="/admin">
+                    <button className="h-9 px-3.5 rounded-full bg-brand-violet/20 hover:bg-brand-violet/30 border border-brand-violet/40 text-brand-violet-light text-xs font-bold transition-all flex items-center gap-1.5 shadow-md hover:scale-105 active:scale-95">
+                      <ShieldCheck className="h-3.5 w-3.5 text-brand-magenta" />
+                      <span>Admin Hub</span>
+                    </button>
+                  </Link>
+                )}
+
                 <Link href="/profile/edit">
                   <button className="h-9 px-4 rounded-full bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] hover:from-[#9D74FF] hover:to-[#F472B6] text-white text-xs font-bold shadow-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5">
                     <Edit3 className="h-3.5 w-3.5" />

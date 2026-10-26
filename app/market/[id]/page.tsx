@@ -799,6 +799,7 @@ export default function MarketProductDetailPage({ params }: { params: { id: stri
           onClose={() => setReportModalOpen(false)}
           targetTitle={title}
           targetType="listing"
+          targetId={typeof params?.id === "string" ? params.id : undefined}
         />
 
         {/* Delete Market Item Confirmation Modal */}
