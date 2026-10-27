@@ -34,7 +34,8 @@ import {
   Calendar,
   Eye,
   Check,
-  X
+  X,
+  Video
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -42,6 +43,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { CAMPUS_LIST } from "@/lib/constants";
 import { UserProfile, UserRole } from "@/types/user.types";
+import { isVideoUrl } from "@/lib/utils";
 import { 
   fetchAdminStatsAction, 
   fetchAdminUsersAction, 
@@ -816,10 +818,28 @@ export default function AdminDashboardPage() {
                 housingList.map((house) => (
                   <div key={house.id} className="rounded-3xl border border-white/10 bg-[#141029] overflow-hidden shadow-lg flex flex-col justify-between">
                     <div>
-                      {/* Image Preview & Badges */}
+                      {/* Image / Video Preview & Badges */}
                       <div className="relative aspect-video w-full bg-[#181333] overflow-hidden">
-                        <img src={house.image} alt={house.title} className="w-full h-full object-cover" />
-                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                        {isVideoUrl(house.image) ? (
+                          <video
+                            src={house.image}
+                            muted
+                            playsInline
+                            autoPlay
+                            loop
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <img
+                            src={house.image || "/campsnest-logo.png"}
+                            alt={house.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "/campsnest-logo.png";
+                            }}
+                          />
+                        )}
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
                           {house.is_featured && (
                             <span className="px-2 py-0.5 rounded-full bg-amber-500/90 text-black text-[10px] font-extrabold flex items-center gap-1 shadow-md">
                               <Star className="h-3 w-3 fill-current" />
@@ -830,6 +850,12 @@ export default function AdminDashboardPage() {
                             <span className="px-2 py-0.5 rounded-full bg-emerald-500/90 text-white text-[10px] font-extrabold flex items-center gap-1 shadow-md">
                               <ShieldCheck className="h-3 w-3" />
                               <span>Verified Host</span>
+                            </span>
+                          )}
+                          {(house.has_video || isVideoUrl(house.image)) && (
+                            <span className="px-2 py-0.5 rounded-full bg-rose-500/90 text-white text-[10px] font-extrabold flex items-center gap-1 shadow-md">
+                              <Video className="h-3 w-3" />
+                              <span>Tour</span>
                             </span>
                           )}
                         </div>
@@ -930,7 +956,14 @@ export default function AdminDashboardPage() {
                   <div key={item.id} className="rounded-3xl border border-white/10 bg-[#141029] overflow-hidden shadow-lg flex flex-col justify-between">
                     <div>
                       <div className="relative aspect-video w-full bg-[#181333] overflow-hidden">
-                        <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                        <img 
+                          src={item.image || "/campsnest-logo.png"} 
+                          alt={item.title} 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "/campsnest-logo.png";
+                          }}
+                        />
                         <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[10px] font-bold text-white uppercase">
                           {item.category}
                         </div>

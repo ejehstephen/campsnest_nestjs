@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { UserProfile, UserRole } from "@/types/user.types";
-import { sanitizeUUID } from "@/lib/utils";
+import { sanitizeUUID, isVideoUrl } from "@/lib/utils";
 
 export interface AdminStats {
   totalUsers: number;
@@ -208,7 +208,7 @@ export async function fetchAdminHousingAction(params?: {
         images:room_listing_images (
           images
         ),
-        owner:users (
+        owner:users!room_listings_owner_id_fkey (
           id,
           name,
           email,
@@ -232,23 +232,77 @@ export async function fetchAdminHousingAction(params?: {
       query = query.or(`title.ilike.%${q}%,location.ilike.%${q}%,school.ilike.%${q}%`);
     }
 
-    const { data, error } = await query.limit(100);
+    let { data, error } = await query.limit(100);
 
-    if (error) {
-      console.warn("fetchAdminHousingAction query warning:", error.message);
-      return { success: false, listings: [] };
+    // Resilient fallback if relationship embedding fails
+    if (error || !data || data.length === 0) {
+      let fallbackQuery = supabase
+        .from("room_listings")
+        .select(`
+          *,
+          images:room_listing_images (
+            images
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (params?.status === "active") {
+        fallbackQuery = fallbackQuery.eq("is_active", true);
+      } else if (params?.status === "inactive") {
+        fallbackQuery = fallbackQuery.eq("is_active", false);
+      } else if (params?.status === "featured") {
+        fallbackQuery = fallbackQuery.eq("is_featured", true);
+      }
+
+      if (params?.search && params.search.trim()) {
+        const q = params.search.trim();
+        fallbackQuery = fallbackQuery.or(`title.ilike.%${q}%,location.ilike.%${q}%,school.ilike.%${q}%`);
+      }
+
+      const { data: fallbackData } = await fallbackQuery.limit(100);
+      if (fallbackData && fallbackData.length > 0) {
+        data = fallbackData;
+        const ownerIds = Array.from(new Set(data.map((h: any) => h.owner_id).filter(Boolean)));
+        if (ownerIds.length > 0) {
+          try {
+            const { data: owners } = await supabase
+              .from("users")
+              .select("id, name, email, phone_number, profile_image, is_verified")
+              .in("id", ownerIds);
+
+            const ownerMap = new Map((owners || []).map((o: any) => [o.id, o]));
+            data = data.map((h: any) => ({
+              ...h,
+              owner: ownerMap.get(h.owner_id) || null,
+            }));
+          } catch (e) {}
+        }
+      }
     }
 
-    const formatted = (data || []).map((h: any) => ({
-      ...h,
-      image: h.images?.[0]?.images || "/campsnest-logo.png",
-      host_name: h.owner?.name || h.host_name || "Campus Host",
-      host_email: h.owner?.email || "",
-      host_phone: h.owner?.phone_number || h.owner_phone || "",
-    }));
+    const formatted = (data || []).map((h: any) => {
+      const mediaList: string[] = (h.images || [])
+        .map((imgObj: any) => imgObj?.images)
+        .filter(Boolean);
+      // Prefer still photos for thumbnail previews, fallback to video or logo
+      const photo = mediaList.find((url: string) => !isVideoUrl(url));
+      const primaryMedia = photo || mediaList[0] || "/campsnest-logo.png";
+      const hasVideo = mediaList.some((url: string) => isVideoUrl(url));
+
+      return {
+        ...h,
+        image: primaryMedia,
+        media_urls: mediaList,
+        has_video: hasVideo,
+        host_name: h.owner?.name || h.host_name || "Campus Host",
+        host_email: h.owner?.email || "",
+        host_phone: h.owner?.phone_number || h.owner_phone || "",
+      };
+    });
 
     return { success: true, listings: formatted };
   } catch (err: any) {
+    console.error("fetchAdminHousingAction exception:", err);
     return { success: false, listings: [] };
   }
 }
